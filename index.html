@@ -1,0 +1,1583 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digital Wind Tunnel: Learn Aerodynamics by Experiment</title>
+</head>
+<body>
+<style>
+/* ============ tokens ============ */
+:root{
+  --bg:#070b10; --panel:#0d1319; --panel2:#111a23; --panel3:#16212c;
+  --border:#1e2c3a; --border2:#2a3b4c;
+  --ink:#dfe9f2; --ink2:#8fa3b5; --ink3:#5c7186;
+  --accent:#35c4dd; --accent-dim:#1b6c7a;
+  --good:#46c07a; --warn:#d9a83c; --bad:#e0524d;
+  --cl:#3a91de; --cd:#d0791f;
+  --mono:"Cascadia Mono","Consolas","SF Mono",ui-monospace,Menlo,monospace;
+  --sans:system-ui,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;
+  background-image:radial-gradient(1200px 500px at 50% -10%, #0c1420 0%, var(--bg) 60%);}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+h1,h2,h3{line-height:1.25;text-wrap:balance}
+::selection{background:var(--accent-dim);color:#fff}
+
+/* ============ header ============ */
+header{display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,#0e161f, #0a1016);position:sticky;top:0;z-index:40}
+#fanIcon{width:34px;height:34px;flex:none}
+#fanBlades{transform-origin:50% 50%;animation:spin 1.1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.brand h1{font-family:var(--mono);font-size:17px;letter-spacing:.12em;font-weight:700;color:var(--ink)}
+.brand p{font-size:11px;color:var(--ink3);letter-spacing:.05em}
+.hbtns{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.hbtn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid var(--border2);
+  border-radius:6px;background:var(--panel2);font-family:var(--mono);font-size:12px;letter-spacing:.04em;
+  transition:border-color .15s, background .15s, transform .1s}
+.hbtn:hover{border-color:var(--accent-dim);background:var(--panel3)}
+.hbtn:active{transform:translateY(1px)}
+.hbtn.primary{border-color:var(--accent-dim);color:var(--accent)}
+.hbtn:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ============ layout ============ */
+main{display:grid;grid-template-columns:minmax(0,1fr) 302px;gap:16px;padding:16px 18px;max-width:1500px;margin:0 auto}
+@media (max-width:980px){main{grid-template-columns:1fr}}
+#stage{min-width:0;display:flex;flex-direction:column;gap:14px}
+
+/* ============ tunnel test section chrome ============ */
+.tunnel{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border2);
+  box-shadow:0 14px 40px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.02)}
+.metal{height:26px;position:relative;
+  background:linear-gradient(180deg,#37424e,#232c36 45%,#1a2129 55%,#2a333e);}
+.metal.bottom{background:linear-gradient(0deg,#37424e,#232c36 45%,#1a2129 55%,#2a333e)}
+.metal .rivets{position:absolute;inset:0;
+  background-image:radial-gradient(circle 3px at 12px 13px, #4c5966 0 2.4px, #141a21 2.6px 3.2px, transparent 3.4px);
+  background-size:56px 26px;background-position:14px 0}
+.metal .plate-label{position:absolute;right:14px;top:50%;transform:translateY(-50%);
+  font-family:var(--mono);font-size:9px;letter-spacing:.22em;color:#6b7a88;text-transform:uppercase}
+.canvas-wrap{position:relative;background:#0a0f15;line-height:0}
+canvas#view{width:100%;height:auto;display:block}
+.glass{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(115deg, rgba(255,255,255,.075) 0%, rgba(255,255,255,.02) 18%, transparent 32%, transparent 78%, rgba(255,255,255,.03) 100%);
+  box-shadow:inset 0 0 70px rgba(0,0,0,.55)}
+/* status pill overlay */
+#statusStrip{position:absolute;top:10px;left:12px;display:flex;gap:8px;align-items:center;pointer-events:auto}
+#statusPill{display:inline-flex;align-items:center;gap:7px;padding:4px 11px;border-radius:20px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.08em;background:rgba(10,15,21,.78);
+  border:1px solid var(--border2);backdrop-filter:blur(3px)}
+#statusPill .dot{width:8px;height:8px;border-radius:50%;background:var(--good);flex:none}
+#statusPill.s-attached .dot{background:var(--good)}
+#statusPill.s-separating .dot{background:var(--warn)}
+#statusPill.s-stalled .dot{background:var(--bad);animation:pulse 0.9s ease-in-out infinite}
+#statusPill.s-stalled{border-color:var(--bad);color:#f4b6b3}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(224,82,77,.7)}50%{box-shadow:0 0 0 6px rgba(224,82,77,0)}}
+#pausePill{display:none;padding:4px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;
+  background:rgba(10,15,21,.78);border:1px solid var(--warn);color:var(--warn)}
+body.paused #pausePill{display:inline-flex}
+/* legend overlay */
+#legend{position:absolute;right:12px;top:10px;width:170px;padding:8px 10px;border-radius:8px;
+  background:rgba(10,15,21,.8);border:1px solid var(--border2);backdrop-filter:blur(3px);cursor:help}
+#legendTitle{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ink2);text-transform:uppercase;margin-bottom:6px}
+#legendBar{height:8px;border-radius:4px;background:linear-gradient(90deg,#04070c,#1560a3,#22a3cf,#d6f7ff)}
+#legendLabels{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--ink3);margin-top:4px}
+
+/* ============ readout tiles ============ */
+#tiles{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+@media (max-width:900px){#tiles{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:520px){#tiles{grid-template-columns:repeat(2,1fr)}}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:10px 13px;cursor:pointer;
+  text-align:left;transition:border-color .15s}
+.tile:hover{border-color:var(--accent-dim)}
+.tile .t-label{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ink3);text-transform:uppercase;display:flex;gap:6px;align-items:center}
+.tile .t-label .chip{width:8px;height:8px;border-radius:2px;flex:none}
+.tile .t-value{font-family:var(--mono);font-size:22px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+.tile .t-sub{font-size:10.5px;color:var(--ink3)}
+.tile.warm .t-value{color:var(--warn)}
+
+/* ============ charts ============ */
+#charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:860px){#charts{grid-template-columns:1fr}}
+.chart-panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px 8px;position:relative}
+.chart-head{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+.chart-head h3{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--ink2);text-transform:uppercase;font-weight:600}
+.chart-legend{display:flex;gap:12px;font-size:11px;color:var(--ink2)}
+.chart-legend .chip{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.chart-head .cbtn{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink3);border:1px solid var(--border);
+  border-radius:5px;padding:2px 8px}
+.chart-head .cbtn:hover{color:var(--ink);border-color:var(--border2)}
+.chart-panel canvas{width:100%;height:150px;display:block;cursor:crosshair}
+#chartTip{position:fixed;z-index:80;pointer-events:none;background:#0c141d;border:1px solid var(--border2);
+  border-radius:6px;padding:6px 9px;font-family:var(--mono);font-size:11px;display:none;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+#chartTip div{white-space:nowrap}
+
+/* ============ control sidebar ============ */
+#controls{display:flex;flex-direction:column;gap:12px}
+.group{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 14px}
+.group>h2{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);
+  font-weight:600;display:flex;align-items:center;gap:7px;margin-bottom:11px}
+.group>h2 .info{margin-left:auto;width:17px;height:17px;border-radius:50%;border:1px solid var(--border2);
+  color:var(--ink3);font-size:10px;font-family:var(--mono);display:inline-flex;align-items:center;justify-content:center;cursor:help}
+.group>h2 .info:hover{color:var(--accent);border-color:var(--accent-dim)}
+.ctl{margin-bottom:12px}
+.ctl:last-child{margin-bottom:0}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--ink2);margin-bottom:5px}
+.ctl label .val{font-family:var(--mono);color:var(--ink);font-size:12px;font-variant-numeric:tabular-nums}
+select,input[type=text]{width:100%;background:var(--panel3);border:1px solid var(--border2);color:var(--ink);
+  border-radius:6px;padding:7px 9px;font:inherit;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.seg button{padding:7px 4px;border:1px solid var(--border2);border-radius:6px;background:var(--panel3);
+  font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:var(--ink2);transition:all .15s}
+.seg button:hover{color:var(--ink);border-color:var(--accent-dim)}
+.seg button.on{background:var(--accent-dim);border-color:var(--accent);color:#eafcff}
+.seg3{grid-template-columns:repeat(3,1fr)}
+.seg3 button.mach.on{background:#5a2320;border-color:var(--bad);color:#f4b6b3}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{padding:8px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--panel3);
+  font-family:var(--mono);font-size:12px;color:var(--ink);transition:all .15s;text-align:center}
+.btn:hover{border-color:var(--accent-dim);background:#1a2733}
+.check{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);cursor:pointer}
+.check input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer}
+#nacaCustomWrap{display:none;margin-top:8px}
+#nacaCustomWrap.show{display:block}
+.hint{font-size:11px;color:var(--ink3);margin-top:5px}
+
+/* ============ tooltip ============ */
+#tip{position:fixed;z-index:100;max-width:290px;background:#0c141d;border:1px solid var(--border2);border-radius:8px;
+  padding:9px 12px;font-size:12px;line-height:1.45;pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .14s, transform .14s;box-shadow:0 8px 26px rgba(0,0,0,.55)}
+#tip.show{opacity:1;transform:translateY(0)}
+#tip .tt{font-weight:600;color:var(--ink)}
+#tip .tw{color:var(--ink2);margin-top:3px}
+#tip .tw::before{content:"Why it matters: ";color:var(--accent);font-family:var(--mono);font-size:10px;letter-spacing:.06em}
+
+/* ============ learn drawer ============ */
+#learnDrawer{position:fixed;top:0;right:0;bottom:0;width:min(430px,94vw);background:var(--panel);
+  border-left:1px solid var(--border2);z-index:60;transform:translateX(102%);transition:transform .28s cubic-bezier(.2,.8,.25,1);
+  display:flex;flex-direction:column;box-shadow:-18px 0 50px rgba(0,0,0,.5)}
+#learnDrawer.open{transform:translateX(0)}
+.drawer-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.drawer-head h2{font-family:var(--mono);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.drawer-head button{margin-left:auto;font-size:20px;color:var(--ink3);padding:2px 8px}
+.drawer-head button:hover{color:var(--ink)}
+.drawer-body{overflow-y:auto;padding:14px 18px 30px;flex:1}
+.card{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:13px 15px;margin-bottom:12px;
+  scroll-margin-top:12px}
+.card.flash{animation:cardflash 1.6s ease-out}
+@keyframes cardflash{0%{border-color:var(--accent);box-shadow:0 0 0 3px rgba(53,196,221,.25)}100%{border-color:var(--border);box-shadow:none}}
+.card h3{font-size:13.5px;color:var(--ink);margin-bottom:5px;display:flex;align-items:center;gap:8px}
+.card h3 .glyph{font-family:var(--mono);color:var(--accent);font-size:12px}
+.card p{font-size:12.5px;color:var(--ink2);margin-bottom:6px}
+.card p b{color:var(--ink);font-weight:600}
+.card .try{margin-top:4px;font-family:var(--mono);font-size:11px;color:var(--accent);border:1px solid var(--accent-dim);
+  border-radius:6px;padding:5px 11px;transition:background .15s}
+.card .try:hover{background:rgba(53,196,221,.12)}
+
+/* ============ modal (anatomy / help) ============ */
+.modal{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;padding:20px;
+  background:rgba(4,7,10,.78);backdrop-filter:blur(4px)}
+.modal.open{display:flex}
+.modal-box{background:var(--panel);border:1px solid var(--border2);border-radius:14px;max-width:960px;width:100%;
+  max-height:92vh;overflow-y:auto;padding:24px 28px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.modal-box h2{font-family:var(--mono);font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+.modal-box>p{color:var(--ink2);font-size:13px;max-width:68ch;margin-bottom:14px}
+.modal-box>p b{color:var(--ink)}
+#anatomySVGwrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:#0a1016;padding:8px}
+.anatomy-legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:9px 20px;margin-top:14px}
+.anatomy-legend div{font-size:12.5px;color:var(--ink2)}
+.anatomy-legend b{color:var(--ink);font-family:var(--mono);font-size:12px}
+.anatomy-legend .num{display:inline-flex;width:18px;height:18px;border-radius:50%;background:var(--accent-dim);color:#eafcff;
+  font-family:var(--mono);font-size:11px;align-items:center;justify-content:center;margin-right:7px}
+.modal-foot{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.modal-foot .hbtn{font-size:12.5px}
+kbd{font-family:var(--mono);font-size:11px;background:var(--panel3);border:1px solid var(--border2);border-bottom-width:2px;
+  border-radius:5px;padding:2px 7px;color:var(--ink)}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:9px 16px;align-items:center;margin-top:10px;font-size:13px;color:var(--ink2)}
+
+/* ============ tour ============ */
+#tourCard{position:fixed;left:18px;bottom:18px;z-index:65;width:min(400px,92vw);background:var(--panel);
+  border:1px solid var(--accent-dim);border-radius:12px;padding:16px 18px;display:none;
+  box-shadow:0 18px 50px rgba(0,0,0,.6)}
+#tourCard.open{display:block;animation:tourIn .3s cubic-bezier(.2,.8,.25,1)}
+@keyframes tourIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+#tourExp{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+#tourTitle{font-size:14.5px;font-weight:600;margin-bottom:6px}
+#tourText{font-size:12.5px;color:var(--ink2);margin-bottom:12px}
+#tourText b{color:var(--ink)}
+.tour-foot{display:flex;align-items:center;gap:8px}
+#tourProg{font-family:var(--mono);font-size:11px;color:var(--ink3);margin-right:auto}
+.tour-foot .hbtn{padding:5px 12px;font-size:11.5px}
+.tour-glow{position:relative;z-index:63;box-shadow:0 0 0 2px var(--accent), 0 0 22px rgba(53,196,221,.5) !important;
+  border-radius:8px;transition:box-shadow .3s}
+
+/* ============ toast ============ */
+#toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);z-index:90;background:#0c141d;
+  border:1px solid var(--border2);border-radius:8px;padding:10px 18px;font-family:var(--mono);font-size:12px;
+  opacity:0;transition:all .25s;pointer-events:none;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+footer{max-width:1500px;margin:0 auto;padding:4px 18px 22px;font-size:11px;color:var(--ink3)}
+footer b{color:var(--ink2)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001s !important;transition-duration:.001s !important}
+}
+</style>
+
+<header>
+  <svg id="fanIcon" viewBox="0 0 40 40" aria-hidden="true">
+    <circle cx="20" cy="20" r="18.5" fill="none" stroke="#2a3b4c" stroke-width="2"/>
+    <g id="fanBlades" fill="#35c4dd">
+      <path d="M20 20 L20 4 A16 16 0 0 1 27 6.5 Z" opacity=".9"/>
+      <path d="M20 20 L34.8 13 A16 16 0 0 1 35.5 20.5 Z" opacity=".9" transform="rotate(30 20 20)"/>
+      <path d="M20 20 L20 4 A16 16 0 0 1 27 6.5 Z" transform="rotate(120 20 20)" opacity=".9"/>
+      <path d="M20 20 L20 4 A16 16 0 0 1 27 6.5 Z" transform="rotate(240 20 20)" opacity=".9"/>
+    </g>
+    <circle cx="20" cy="20" r="4" fill="#16212c" stroke="#4c5966" stroke-width="1.5"/>
+  </svg>
+  <div class="brand">
+    <h1>DIGITAL WIND TUNNEL</h1>
+    <p>An interactive lab for learning aerodynamics: no wind required</p>
+  </div>
+  <div class="hbtns">
+    <button class="hbtn primary" id="tourBtn" data-tip="Start a guided, step-by-step set of experiments." data-why="The fastest way to learn: each step sets up the tunnel for you and tells you exactly what to watch for.">▶ Guided Tour</button>
+    <button class="hbtn" id="learnBtn" data-tip="Open the Learn panel: plain-language explanations of every concept." data-why="Every term on this page (lift, stall, Reynolds number…) is explained here, each with a one-click demo.">📖 Learn</button>
+    <button class="hbtn" id="anatomyBtn" data-tip="See how a real wind tunnel is built, part by part." data-why="This simulator models only the test section: the diagram shows where that fits in the full machine.">⊙ Tunnel Anatomy</button>
+    <button class="hbtn" id="snapBtn" data-tip="Save a PNG snapshot of the current flow, stamped with your settings." data-why="Great for reports and presentations: the image records angle of attack, speed and coefficients.">⤓ Snapshot</button>
+    <button class="hbtn" id="helpBtn" data-tip="Keyboard shortcuts and quick help." data-why="Power users drive the tunnel from the keyboard: arrow keys change angle of attack live.">?</button>
+  </div>
+</header>
+
+<main>
+  <section id="stage">
+    <div class="tunnel">
+      <div class="metal"><div class="rivets"></div><div class="plate-label">test section · bay 01</div></div>
+      <div class="canvas-wrap">
+        <canvas id="view"></canvas>
+        <div class="glass"></div>
+        <div id="statusStrip">
+          <span id="statusPill" class="s-attached" data-tip="Live flow status over the model: attached, separating, or stalled." data-why="Attached flow follows the surface and makes efficient lift. When it separates, lift collapses and drag soars: this pill is your stall warning, like the stick-shaker in a real aircraft.">
+            <span class="dot"></span><span id="statusText">FLOW: ATTACHED</span>
+          </span>
+          <span id="pausePill">⏸ PAUSED</span>
+        </div>
+        <div id="legend" data-tip="Color scale for the current view mode." data-why="Reading a color map is a core wind-tunnel skill: always check the legend before interpreting colors.">
+          <div id="legendTitle">Speed</div>
+          <div id="legendBar"></div>
+          <div id="legendLabels"><span id="legendMin">0</span><span id="legendMax">max</span></div>
+        </div>
+      </div>
+      <div class="metal bottom"><div class="rivets"></div><div class="plate-label">⌀ scale 10 cm / div</div></div>
+    </div>
+
+    <div id="tiles">
+      <button class="tile" id="tile-alpha" data-learn="learn-aoa" data-tip="Angle of attack (α): the angle between the wing chord line and the oncoming air. Click for the full explanation." data-why="It is the pilot's main lever for lift: pull the nose up and lift grows… until the stall.">
+        <span class="t-label">α · Angle of attack</span>
+        <span class="t-value" id="v-alpha">0.0°</span>
+        <span class="t-sub">chord vs. airflow</span>
+      </button>
+      <button class="tile" id="tile-cl" data-learn="learn-lift" data-tip="Lift coefficient C_L: lift force made dimensionless. Click to learn how lift works." data-why="C_L lets you compare a 30 cm model to a 30 m wing fairly. Cruise airliners fly around C_L ≈ 0.5; near 1.5+ with flaps for landing.">
+        <span class="t-label"><span class="chip" style="background:var(--cl)"></span>C_L · Lift coeff.</span>
+        <span class="t-value" id="v-cl">0.00</span>
+        <span class="t-sub">up = positive</span>
+      </button>
+      <button class="tile" id="tile-cd" data-learn="learn-drag" data-tip="Drag coefficient C_D: resistance force made dimensionless. Click to learn about drag." data-why="Every count of drag costs fuel. A clean airfoil is ~0.01-0.05; a cylinder is ~1.0: shape matters enormously.">
+        <span class="t-label"><span class="chip" style="background:var(--cd)"></span>C_D · Drag coeff.</span>
+        <span class="t-value" id="v-cd">0.00</span>
+        <span class="t-sub">downstream force</span>
+      </button>
+      <button class="tile" id="tile-ld" data-learn="learn-lift" data-tip="Lift-to-drag ratio: aerodynamic efficiency in one number." data-why="L/D is the number designers brag about. Gliders exceed 50; airliners ~18. Higher means more lift for less fuel.">
+        <span class="t-label">L / D · Efficiency</span>
+        <span class="t-value" id="v-ld">n/a</span>
+        <span class="t-sub">lift per unit drag</span>
+      </button>
+      <button class="tile" id="tile-re" data-learn="learn-re" data-tip="Reynolds number of this simulation (model scale)." data-why="Re tells you whether flow behaves syrupy-smooth (low Re) or lively and turbulent (high Re). Matching Re is how model tests predict full-size aircraft.">
+        <span class="t-label">Re · Reynolds no.</span>
+        <span class="t-value" id="v-re">n/a</span>
+        <span class="t-sub">inertia ÷ viscosity</span>
+      </button>
+      <button class="tile" id="tile-mach" data-learn="learn-mach" data-tip="Mach number: flow speed ÷ speed of sound (343 m/s at sea level)." data-why="Below ~0.3 air is effectively incompressible; approaching Mach 1 it compresses and forms shock waves: the boundary between two whole regimes of aerodynamics.">
+        <span class="t-label">Ma · Mach number</span>
+        <span class="t-value" id="v-mach">0.09</span>
+        <span class="t-sub" id="mach-sub">subsonic</span>
+      </button>
+    </div>
+
+    <div id="charts">
+      <div class="chart-panel">
+        <div class="chart-head">
+          <h3 data-tip="Live strip-chart of the force coefficients, like a real tunnel's data acquisition display." data-why="Oscillating traces mean unsteady flow: vortex shedding shows up as a beautiful rhythmic wave here.">Force history</h3>
+          <div class="chart-legend"><span><span class="chip" style="background:var(--cl)"></span>C_L</span><span><span class="chip" style="background:var(--cd)"></span>C_D</span></div>
+        </div>
+        <canvas id="historyChart"></canvas>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-head">
+          <h3 data-tip="Lift coefficient vs. angle of attack: the most famous graph in aerodynamics." data-why="Sweep α with the arrow keys and draw this curve yourself. The straight rise, the peak (C_L max), and the post-stall drop are the fingerprint of every wing.">Lift curve · C_L vs α</h3>
+          <button class="cbtn" id="clearLiftBtn" data-tip="Erase collected lift-curve points." data-why="Clear between experiments so data from different shapes doesn't mix.">clear</button>
+        </div>
+        <canvas id="liftChart"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <aside id="controls">
+    <div class="group">
+      <h2>Test body <span class="info" data-tip="The model mounted in the test section." data-why="Real tunnels test everything from wing sections to full car models. Each shape here teaches a different lesson.">i</span></h2>
+      <div class="ctl">
+        <label for="bodySelect">Model</label>
+        <select id="bodySelect" data-tip="Choose what to mount in the tunnel: airfoils, a cylinder, a flat plate, or nothing." data-why="Streamlined vs. bluff bodies behave completely differently: compare the airfoil's clean wake with the cylinder's swirling one.">
+          <option value="n2412">Airfoil: NACA 2412 (Cessna wing)</option>
+          <option value="n0012">Airfoil: NACA 0012 (symmetric)</option>
+          <option value="n4415">Airfoil: NACA 4415 (high camber)</option>
+          <option value="custom">Airfoil: custom NACA code…</option>
+          <option value="cyl">Cylinder (bluff body)</option>
+          <option value="plate">Flat plate</option>
+          <option value="none">Empty tunnel</option>
+        </select>
+        <div id="nacaCustomWrap">
+          <input type="text" id="nacaCustom" maxlength="4" placeholder="e.g. 6412" inputmode="numeric"
+            data-tip="Type any 4-digit NACA code and press Enter." data-why="The code is a recipe: 1st digit = camber (% chord), 2nd = camber position (tenths of chord), last two = thickness (% chord). NACA 6412 = 6% camber at 40%, 12% thick.">
+          <div class="hint">digit 1: camber % · digit 2: camber pos ×10% · digits 3-4: thickness %</div>
+        </div>
+      </div>
+      <div class="ctl">
+        <label for="aoaSlider">Angle of attack <span class="val" id="aoaVal">4.0°</span></label>
+        <input type="range" id="aoaSlider" min="-15" max="20" step="0.5" value="4"
+          data-tip="Tilt the model relative to the wind, from −15° to +20°. Arrow keys work too." data-why="This is the heart of the lab: more α → more lift, linearly, until the flow can no longer follow the upper surface and the wing stalls. Try pushing past 15°.">
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Flow settings <span class="info" data-tip="What kind of air (or liquid!) flows through the tunnel, and how fast." data-why="Speed and viscosity together set the Reynolds number: the single most important similarity parameter in fluid dynamics.">i</span></h2>
+      <div class="ctl">
+        <label for="speedSlider">Wind speed <span class="val" id="speedVal">30 m/s</span></label>
+        <input type="range" id="speedSlider" min="5" max="60" step="1" value="30"
+          data-tip="Fan speed: how fast air enters the test section (5-60 m/s for the slider)." data-why="Forces grow with the square of speed: double the speed, four times the lift and drag. Watch the coefficients stay roughly constant while the raw forces would soar.">
+        <div class="seg seg3" id="speedPresets" style="margin-top:8px">
+          <button data-spd="60" data-tip="Highway / small-plane speed: 60 m/s ≈ 216 km/h, Mach 0.17." data-why="Comfortably incompressible: air behaves like an ordinary fluid and this solver is fully valid here.">60 m/s</button>
+          <button data-spd="170" class="mach" data-tip="Mach 0.5: 170 m/s, half the speed of sound." data-why="Compressibility starts to matter around Mach 0.3; by 0.5 air density changes are real, though shocks haven't appeared yet.">Mach 0.5</button>
+          <button data-spd="343" class="mach" data-tip="Mach 1: 343 m/s, the speed of sound (the 'sound barrier')." data-why="At Mach 1 air compresses into shock waves: a different physical regime this incompressible solver can't compute, so the shock shown is a labeled schematic.">Mach 1</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <label for="fluidSelect">Working fluid</label>
+        <select id="fluidSelect" data-tip="Swap the fluid in the tunnel: air, water, or thick syrup." data-why="Same shape + thicker fluid = lower Reynolds number. In syrup the wake turns smooth and steady; in air it breaks into turbulence. This is why bees and jumbo jets live in different aerodynamic worlds.">
+          <option value="air">Air (low viscosity)</option>
+          <option value="water">Water-like (medium)</option>
+          <option value="syrup">Syrup (very viscous)</option>
+        </select>
+      </div>
+      <div class="row2">
+        <button class="btn" id="pauseBtn" data-tip="Freeze / resume the simulation (Space)." data-why="Pause to study a single instant: vortices hold their positions like a photograph.">⏸ Pause</button>
+        <button class="btn" id="resetBtn" data-tip="Restart the airflow from a clean, uniform stream (R)." data-why="After big changes the flow needs a moment to settle; reset gives you a fresh, repeatable starting condition: just like stabilizing a real tunnel before taking data.">↻ Reset flow</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Visualization <span class="info" data-tip="How the invisible flow is made visible." data-why="Air is transparent: every technique here (smoke, color maps) mirrors a real experimental method: smoke wands, pressure taps, PIV.">i</span></h2>
+      <div class="ctl">
+        <label>View mode</label>
+        <div class="seg" id="viewSeg">
+          <button data-view="smoke" data-tip="Smoke trails only, like a classic smoke-wand demo." data-why="Smoke follows streamlines. Where filaments squeeze together the air moves faster; where they swirl, the flow has separated.">Smoke</button>
+          <button data-view="speed" class="on" data-tip="Color map of air speed: dark = slow, bright = fast." data-why="Spot the stagnation point (dark, at the nose) and the fast thin layer racing over the wing's top: the engine of lift.">Speed</button>
+          <button data-view="pressure" data-tip="Color map of pressure: blue = low (suction), orange = high." data-why="Wings are mostly *sucked* upward: the low-pressure (blue) zone on top typically contributes about two-thirds of the lift.">Pressure</button>
+          <button data-view="vort" data-tip="Vorticity: local spin of the air. Two colors = two spin directions." data-why="Vorticity reveals the boundary layer peeling off the surface and the alternating vortex street behind bluff bodies.">Vorticity</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <label class="check"><input type="checkbox" id="smokeToggle" checked
+          data-tip="Overlay smoke filaments on any color view." data-why="Combining smoke with a field map is like running two instruments at once: direction from smoke, magnitude from color."> Smoke overlay</label>
+      </div>
+      <div class="ctl">
+        <label for="smokeSlider">Smoke density <span class="val" id="smokeVal">60%</span></label>
+        <input type="range" id="smokeSlider" min="0" max="100" step="5" value="60"
+          data-tip="How much smoke the rake injects at the inlet." data-why="Real tunnels meter smoke carefully: too little and you see nothing, too much and it blurs the flow features.">
+      </div>
+      <div class="ctl">
+        <label for="qualitySelect">Simulation quality</label>
+        <select id="qualitySelect" data-tip="Grid resolution of the fluid solver. Higher = sharper flow, more CPU." data-why="Real CFD faces the same trade-off: finer grids capture smaller eddies but cost far more compute. Supercomputers exist for exactly this reason.">
+          <option value="fast">Fast (coarse grid)</option>
+          <option value="balanced" selected>Balanced</option>
+          <option value="high">High (fine grid)</option>
+        </select>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <b>Physics:</b> D2Q9 lattice-Boltzmann fluid solver, computed live in your browser. A 2-D educational model: trends are real, exact numbers are not flight data. Built for students, inspired by classic smoke-tunnel demonstrations.
+</footer>
+
+<div id="tip" role="tooltip"><div class="tt"></div><div class="tw"></div></div>
+<div id="chartTip"></div>
+<div id="toast"></div>
+
+<!-- ============ LEARN DRAWER ============ -->
+<aside id="learnDrawer" aria-label="Learn panel">
+  <div class="drawer-head"><h2>Learn: Aerodynamics Glossary</h2><button id="learnClose" aria-label="Close">✕</button></div>
+  <div class="drawer-body" id="learnBody"></div>
+</aside>
+
+<!-- ============ ANATOMY MODAL ============ -->
+<div class="modal" id="anatomyModal">
+  <div class="modal-box">
+    <h2>Anatomy of a real wind tunnel</h2>
+    <p id="anatomyIntro"><b>Welcome!</b> Before you run your first experiment, meet the machine. A wind tunnel doesn't move the aircraft: it moves the <b>air</b>, and holds the model still. This diagram shows a closed-circuit tunnel, the kind used by NASA and universities: air loops around continuously, driven by a fan. Everything you'll simulate on this page happens in one place: the <b>test section</b> (highlighted).</p>
+    <div id="anatomySVGwrap">
+      <svg viewBox="0 0 920 460" width="920" height="460" style="min-width:760px;display:block" aria-label="Closed-circuit wind tunnel diagram">
+        <!-- duct loop -->
+        <rect x="60" y="60" width="800" height="330" rx="56" fill="none" stroke="#1c2833" stroke-width="72"/>
+        <rect x="60" y="60" width="800" height="330" rx="56" fill="none" stroke="#26333f" stroke-width="60"/>
+        <rect x="60" y="60" width="800" height="330" rx="56" fill="none" stroke="#0e1620" stroke-width="46"/>
+        <!-- corner turning vanes -->
+        <g stroke="#3a4a5a" stroke-width="3" fill="none" opacity=".9">
+          <path d="M84 96 q14 -14 28 -28"/><path d="M72 84 q14 -14 28 -28"/><path d="M96 108 q14 -14 28 -28"/>
+          <path d="M836 96 q-14 -14 -28 -28"/><path d="M848 84 q-14 -14 -28 -28"/><path d="M824 108 q-14 -14 -28 -28"/>
+          <path d="M836 354 q-14 14 -28 28"/><path d="M848 366 q-14 14 -28 28"/><path d="M824 342 q-14 14 -28 28"/>
+          <path d="M84 354 q14 14 28 28"/><path d="M72 366 q14 14 28 28"/><path d="M96 342 q14 14 28 28"/>
+        </g>
+        <!-- settling chamber + honeycomb (top-left) -->
+        <rect x="140" y="34" width="120" height="52" rx="4" fill="#101a24" stroke="#3a4a5a"/>
+        <g stroke="#2e3f4f" stroke-width="2">
+          <line x1="155" y1="38" x2="155" y2="82"/><line x1="170" y1="38" x2="170" y2="82"/>
+          <line x1="185" y1="38" x2="185" y2="82"/><line x1="200" y1="38" x2="200" y2="82"/>
+          <line x1="215" y1="38" x2="215" y2="82"/><line x1="230" y1="38" x2="230" y2="82"/><line x1="245" y1="38" x2="245" y2="82"/>
+        </g>
+        <!-- contraction cone -->
+        <path d="M262 30 L360 46 L360 74 L262 90 Z" fill="#13202c" stroke="#3a4a5a" stroke-width="1.5"/>
+        <!-- test section (highlight) -->
+        <rect x="362" y="42" width="196" height="36" rx="3" fill="#0b2b33" stroke="#35c4dd" stroke-width="2.5"/>
+        <rect x="362" y="42" width="196" height="36" rx="3" fill="none" stroke="#35c4dd" stroke-width="6" opacity=".16"/>
+        <!-- tiny airfoil + smoke in test section -->
+        <path d="M395 60 q28 -8 62 -2 q-30 10 -62 2 Z" fill="#8fa3b5" transform="rotate(-6 425 60)"/>
+        <g stroke="#57e6ff" stroke-width="1.1" fill="none" opacity=".7">
+          <path d="M368 52 h20 q30 -6 70 -3 q40 2 92 3"/>
+          <path d="M368 60 h18 q34 -4 74 0 q40 3 92 1"/>
+          <path d="M368 68 h22 q30 6 68 4 q42 -1 92 -2"/>
+        </g>
+        <!-- diffuser -->
+        <path d="M560 44 L700 30 L700 90 L560 76 Z" fill="#13202c" stroke="#3a4a5a" stroke-width="1.5"/>
+        <!-- fan (bottom leg) -->
+        <circle cx="450" cy="367" r="40" fill="#101a24" stroke="#3a4a5a" stroke-width="2"/>
+        <g style="transform-origin:450px 367px;animation:spin 2.6s linear infinite" fill="#35c4dd" opacity=".95">
+          <ellipse cx="450" cy="341" rx="8" ry="22"/>
+          <ellipse cx="450" cy="341" rx="8" ry="22" transform="rotate(72 450 367)"/>
+          <ellipse cx="450" cy="341" rx="8" ry="22" transform="rotate(144 450 367)"/>
+          <ellipse cx="450" cy="341" rx="8" ry="22" transform="rotate(216 450 367)"/>
+          <ellipse cx="450" cy="341" rx="8" ry="22" transform="rotate(288 450 367)"/>
+        </g>
+        <circle cx="450" cy="367" r="9" fill="#16212c" stroke="#4c5966" stroke-width="2"/>
+        <!-- flow chevrons on motion path -->
+        <g fill="#57e6ff">
+          <circle r="4" opacity=".85"><animateMotion dur="7s" repeatCount="indefinite" path="M460 60 H820 Q860 60 860 100 V350 Q860 390 820 390 H100 Q60 390 60 350 V100 Q60 60 100 60 H460"/></circle>
+          <circle r="4" opacity=".85"><animateMotion dur="7s" begin="-1.75s" repeatCount="indefinite" path="M460 60 H820 Q860 60 860 100 V350 Q860 390 820 390 H100 Q60 390 60 350 V100 Q60 60 100 60 H460"/></circle>
+          <circle r="4" opacity=".85"><animateMotion dur="7s" begin="-3.5s" repeatCount="indefinite" path="M460 60 H820 Q860 60 860 100 V350 Q860 390 820 390 H100 Q60 390 60 350 V100 Q60 60 100 60 H460"/></circle>
+          <circle r="4" opacity=".85"><animateMotion dur="7s" begin="-5.25s" repeatCount="indefinite" path="M460 60 H820 Q860 60 860 100 V350 Q860 390 820 390 H100 Q60 390 60 350 V100 Q60 60 100 60 H460"/></circle>
+        </g>
+        <!-- number labels -->
+        <g font-family="Consolas,monospace" font-size="15" font-weight="700">
+          <circle cx="450" cy="315" r="12" fill="#1b6c7a"/><text x="450" y="320" fill="#eafcff" text-anchor="middle">1</text>
+          <circle cx="118" cy="228" r="12" fill="#1b6c7a"/><text x="118" y="233" fill="#eafcff" text-anchor="middle">2</text>
+          <circle cx="200" cy="120" r="12" fill="#1b6c7a"/><text x="200" y="125" fill="#eafcff" text-anchor="middle">3</text>
+          <circle cx="311" cy="120" r="12" fill="#1b6c7a"/><text x="311" y="125" fill="#eafcff" text-anchor="middle">4</text>
+          <circle cx="460" cy="120" r="12" fill="#35c4dd"/><text x="460" y="125" fill="#06222a" text-anchor="middle">5</text>
+          <circle cx="632" cy="120" r="12" fill="#1b6c7a"/><text x="632" y="125" fill="#eafcff" text-anchor="middle">6</text>
+        </g>
+      </svg>
+    </div>
+    <div class="anatomy-legend">
+      <div><span class="num">1</span><b>Fan &amp; drive</b>: a giant propeller pushes the air around the loop. Big tunnels use fans the size of houses driven by megawatt motors.</div>
+      <div><span class="num">2</span><b>Turning vanes</b>: curved blades in each corner steer the air smoothly around the bend so it doesn't tumble.</div>
+      <div><span class="num">3</span><b>Settling chamber &amp; honeycomb</b>: screens and honeycomb straighten the flow, ironing out swirl and turbulence before the measurement.</div>
+      <div><span class="num">4</span><b>Contraction cone</b>: the duct narrows, so the air must speed up (conservation of mass). This also flattens out any remaining unevenness.</div>
+      <div><span class="num">5</span><b>Test section, you are here!</b> the fastest, cleanest air meets the model. Everything this simulator shows happens in this glass box.</div>
+      <div><span class="num">6</span><b>Diffuser</b>: the duct widens gently, slowing the air to recover pressure so the fan needs less power.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="hbtn primary" id="anatomyTourBtn">▶ Start the guided tour</button>
+      <button class="hbtn" id="anatomyCloseBtn">Close &amp; explore freely</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ HELP MODAL ============ -->
+<div class="modal" id="helpModal">
+  <div class="modal-box" style="max-width:560px">
+    <h2>Keyboard controls</h2>
+    <div class="keys">
+      <span><kbd>Space</kbd></span><span>Pause / resume the simulation: freeze the flow to study it.</span>
+      <span><kbd>R</kbd></span><span>Reset the flow to a clean uniform stream (settings are kept).</span>
+      <span><kbd>←</kbd> <kbd>→</kbd></span><span>Decrease / increase angle of attack by 0.5°: sweep the lift curve by hand.</span>
+      <span><kbd>V</kbd></span><span>Cycle view modes: smoke → speed → pressure → vorticity.</span>
+      <span><kbd>S</kbd></span><span>Toggle the smoke overlay on and off.</span>
+      <span><kbd>?</kbd></span><span>Show this help.</span>
+      <span><kbd>Esc</kbd></span><span>Close panels and dialogs.</span>
+    </div>
+    <div class="modal-foot"><button class="hbtn" id="helpCloseBtn">Close</button></div>
+  </div>
+</div>
+
+<div id="tourCard" role="dialog" aria-label="Guided tour">
+  <div id="tourExp"></div>
+  <div id="tourTitle"></div>
+  <div id="tourText"></div>
+  <div class="tour-foot">
+    <span id="tourProg"></span>
+    <button class="hbtn" id="tourBack">← Back</button>
+    <button class="hbtn primary" id="tourNext">Next →</button>
+    <button class="hbtn" id="tourExit" style="border-color:var(--border)">✕</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+(() => {
+/* =========================================================================
+   DIGITAL WIND TUNNEL: original educational implementation
+   Fluid solver: D2Q9 lattice-Boltzmann (BGK relaxation), a standard
+   textbook algorithm, implemented from scratch for this project.
+   ========================================================================= */
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const clamp = (v,a,b) => v<a?a:(v>b?b:v);
+
+/* ---------------- quality / grid config ---------------- */
+const QUALITY = {
+  fast:     { w: 240, h: 100, steps: 8  },
+  balanced: { w: 320, h: 132, steps: 10 },
+  high:     { w: 400, h: 164, steps: 12 },
+};
+const SCALE = 3;                 // canvas px per lattice cell
+const FLUIDS = { air:0.016, water:0.055, syrup:0.14 };  // lattice kinematic viscosity
+
+/* ---------------- state ---------------- */
+const state = {
+  body: "n2412",
+  customNaca: "6412",
+  alpha: 4, alphaTarget: 4,      // degrees (eased)
+  speed: 30,                     // m/s (display)
+  fluid: "air",
+  view: "speed",
+  smokeOn: true, smokeDensity: 60,
+  quality: "balanced",
+  paused: false,
+  settleFrames: 0,               // frames since last disturbance (for lift-curve capture)
+};
+
+/* ---------------- LBM core ---------------- */
+const ex=[0,1,-1,0,0,1,-1,-1,1], ey=[0,0,0,-1,1,-1,-1,1,1];
+const opp=[0,2,1,4,3,7,8,5,6];
+const wgt=[4/9,1/9,1/9,1/9,1/9,1/36,1/36,1/36,1/36];
+let W,H,N, f=[], g=[], barrier, rho, vx, vy;
+let u0=0.07, nu=FLUIDS.air, omega=1;
+let inletEq = new Float32Array(9);
+let forceX=0, forceY=0;          // per-frame averaged momentum exchange (lattice, y down)
+let clS=0, cdS=0, ldS=0;         // smoothed coefficients
+let frame=0;
+
+const SOUND_MS = 343;                                            // speed of sound at sea level
+function latticeUraw(spd){ return 0.018 + (spd/60)*0.092; }      // 5→~0.026, 60→0.11
+// The solver is incompressible; hold the lattice velocity at its stable max above 60 m/s
+// so high-speed / Mach presets stay stable. The displayed speed & Mach are the real values.
+function latticeU(){ return latticeUraw(Math.min(state.speed,60)); }
+function machNumber(){ return state.speed/SOUND_MS; }
+
+function computeInletEq(){
+  // equilibrium populations for uniform horizontal inflow at speed u0
+  for(let i=0;i<9;i++){ const eu = ex[i]*u0; inletEq[i] = wgt[i]*(1+3*eu+4.5*eu*eu-1.5*u0*u0); }
+}
+
+function allocate(){
+  const q = QUALITY[state.quality];
+  W=q.w; H=q.h; N=W*H;
+  f=[]; g=[];
+  for(let i=0;i<9;i++){ f.push(new Float32Array(N)); g.push(new Float32Array(N)); }
+  barrier = new Uint8Array(N);
+  rho = new Float32Array(N); vx = new Float32Array(N); vy = new Float32Array(N);
+}
+
+function initFlow(){
+  u0 = latticeU(); nu = FLUIDS[state.fluid];
+  omega = 1/(3*nu+0.5);
+  computeInletEq();
+  for(let i=0;i<9;i++) f[i].fill(inletEq[i]);
+  rho.fill(1); vx.fill(u0); vy.fill(0);
+  clS=0; cdS=0; state.settleFrames=0;
+}
+
+// Smagorinsky LES constant packaged for the relaxation-time formula:
+//   tau* = ½( tau0 + sqrt(tau0² + 18√2·Cs²·|Π^neq|/ρ) ),  Cs ≈ 0.14
+// This only ever ADDS eddy viscosity (tau* ≥ tau0), so it strictly stabilizes.
+const CSMAG = 18*Math.SQRT2*0.14*0.14;
+function collide(){
+  const tau0 = 1/omega;
+  const tau0sq = tau0*tau0;
+  for(let k=0;k<N;k++){
+    if(barrier[k]) continue;
+    const f0=f[0][k],f1=f[1][k],f2=f[2][k],f3=f[3][k],f4=f[4][k],f5=f[5][k],f6=f[6][k],f7=f[7][k],f8=f[8][k];
+    let r = f0+f1+f2+f3+f4+f5+f6+f7+f8;
+    if(r<=0) r=1e-6;
+    const ux=(f1-f2+f5-f6-f7+f8)/r, uy=(f4-f3-f5-f6+f7+f8)/r;
+    rho[k]=r; vx[k]=ux; vy[k]=uy;
+    const usq=1.5*(ux*ux+uy*uy);
+    const c1=3*ux, c2=3*uy;
+    // equilibria
+    const e0=wgt[0]*r*(1-usq);
+    let eu;
+    eu=c1;      const e1=wgt[1]*r*(1+eu+0.5*eu*eu-usq);
+    eu=-c1;     const e2=wgt[2]*r*(1+eu+0.5*eu*eu-usq);
+    eu=-c2;     const e3=wgt[3]*r*(1+eu+0.5*eu*eu-usq);
+    eu=c2;      const e4=wgt[4]*r*(1+eu+0.5*eu*eu-usq);
+    eu=c1-c2;   const e5=wgt[5]*r*(1+eu+0.5*eu*eu-usq);
+    eu=-c1-c2;  const e6=wgt[6]*r*(1+eu+0.5*eu*eu-usq);
+    eu=-c1+c2;  const e7=wgt[7]*r*(1+eu+0.5*eu*eu-usq);
+    eu=c1+c2;   const e8=wgt[8]*r*(1+eu+0.5*eu*eu-usq);
+    // non-equilibrium momentum-flux tensor Π^neq
+    const n1=f1-e1,n2=f2-e2,n3=f3-e3,n4=f4-e4,n5=f5-e5,n6=f6-e6,n7=f7-e7,n8=f8-e8;
+    const Pxx=n1+n2+n5+n6+n7+n8;
+    const Pyy=n3+n4+n5+n6+n7+n8;
+    const Pxy=-n5+n6-n7+n8;
+    const Pmag=Math.sqrt(Pxx*Pxx+Pyy*Pyy+2*Pxy*Pxy);
+    // local (turbulence-augmented) relaxation
+    const taus=0.5*(tau0+Math.sqrt(tau0sq+CSMAG*Pmag/r));
+    const om=1/taus;
+    f[0][k]=f0+om*(e0-f0);
+    f[1][k]=f1-om*n1; f[2][k]=f2-om*n2; f[3][k]=f3-om*n3; f[4][k]=f4-om*n4;
+    f[5][k]=f5-om*n5; f[6][k]=f6-om*n6; f[7][k]=f7-om*n7; f[8][k]=f8-om*n8;
+  }
+}
+
+let stepFx=0, stepFy=0;
+function stream(){
+  stepFx=0; stepFy=0;
+  for(let i=1;i<9;i++){
+    const fi=f[i], gi=g[i], dx=ex[i], dy=ey[i], fo=f[opp[i]];
+    for(let y=1;y<H-1;y++){
+      const row=y*W, srow=(y-dy)*W;
+      for(let x=1;x<W-1;x++){
+        const k=row+x, sk=srow+(x-dx);
+        if(barrier[sk]){
+          const val=fo[k];
+          gi[k]=val;                       // half-way bounce-back
+          // Ladd momentum-exchange force on the body: −c·(f_in + f_out).
+          // This form cancels the free-stream throughflow around a closed body,
+          // so it yields the true hydrodynamic force (verified against theory).
+          const pair = val + fi[k];
+          stepFx += -dx*pair; stepFy += -dy*pair;
+        } else {
+          gi[k]=fi[sk];
+        }
+      }
+    }
+  }
+  // swap
+  for(let i=1;i<9;i++){ const t=f[i]; f[i]=g[i]; g[i]=t; }
+  boundaries();
+}
+
+function boundaries(){
+  // inlet (left), outlet (right, zero-gradient), top/bottom free-stream
+  for(let y=0;y<H;y++){
+    const k=y*W;
+    for(let i=0;i<9;i++){ f[i][k]=inletEq[i]; f[i][k+W-1]=f[i][k+W-2]; }
+  }
+  const last=(H-1)*W;
+  for(let x=0;x<W;x++){
+    for(let i=0;i<9;i++){ f[i][x]=inletEq[i]; f[i][last+x]=inletEq[i]; }
+  }
+}
+
+/* ---------------- test bodies ---------------- */
+const BODY_INFO = {
+  n0012:{type:"naca", code:"0012", label:"NACA 0012"},
+  n2412:{type:"naca", code:"2412", label:"NACA 2412"},
+  n4415:{type:"naca", code:"4415", label:"NACA 4415"},
+  custom:{type:"naca", code:null, label:"custom"},
+  cyl:{type:"cyl", label:"Cylinder"},
+  plate:{type:"plate", label:"Flat plate"},
+  none:{type:"none", label:"Empty"},
+};
+function nacaCode(){ return state.body==="custom" ? state.customNaca : BODY_INFO[state.body].code; }
+
+function nacaHalf(code, xc){
+  // returns [yUpper, yLower] per unit chord (thin approximation: camber ± thickness)
+  const m=+code[0]/100, p=+code[1]/10, t=(+code.substring(2))/100;
+  const yt = 5*t*(0.2969*Math.sqrt(xc)-0.1260*xc-0.3516*xc*xc+0.2843*xc**3-0.1036*xc**4);
+  let yc=0;
+  if(m>0 && p>0){
+    yc = xc<p ? m/(p*p)*(2*p*xc-xc*xc) : m/((1-p)*(1-p))*((1-2*p)+2*p*xc-xc*xc);
+  }
+  return [yc+yt, yc-yt];
+}
+
+let refLen = 60; // reference length (cells) for coefficients & Re
+function bodyGeom(){
+  return { cx: Math.round(W*0.34), cy: Math.round(H*0.5), chord: Math.round(H*0.56), rad: Math.round(H*0.10) };
+}
+
+function buildBarrier(){
+  barrier.fill(0);
+  const info=BODY_INFO[state.body];
+  const {cx,cy,chord,rad}=bodyGeom();
+  const a = state.alpha*Math.PI/180;        // screen-space rotation (y down): positive = nose up
+  const ca=Math.cos(a), sa=Math.sin(a);
+  if(info.type==="none"){ refLen=chord; return; }
+  if(info.type==="cyl"){
+    refLen = rad*2;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const dx=x-cx, dy=y-cy;
+      if(dx*dx+dy*dy<=rad*rad) barrier[y*W+x]=1;
+    }
+    return;
+  }
+  const code = info.type==="plate" ? null : nacaCode();
+  refLen=chord;
+  const pivot = 0.25;                        // rotate about quarter chord
+  const x0=cx-chord*pivot;
+  // bounding box scan
+  const bb = Math.ceil(chord*0.8);
+  for(let y=Math.max(1,cy-bb); y<Math.min(H-1,cy+bb); y++){
+    for(let x=Math.max(1,cx-bb); x<Math.min(W-1,cx+bb); x++){
+      // grid → body frame (inverse rotate about pivot point)
+      const gx=x-(x0+chord*pivot), gy=y-cy;
+      const bx= gx*ca+gy*sa, by= -gx*sa+gy*ca;
+      const xc=(bx+chord*pivot)/chord;
+      if(xc<0||xc>1) continue;
+      const yb = -by/chord;                  // body-frame y, up positive
+      if(code){
+        const [yu,yl]=nacaHalf(code, Math.max(xc,0.002));
+        if(yb<=yu && yb>=yl) barrier[y*W+x]=1;
+      } else {
+        if(Math.abs(yb)<=0.016) barrier[y*W+x]=1;  // flat plate
+      }
+    }
+  }
+}
+
+function outlinePts(){
+  // body outline in canvas pixels for crisp drawing
+  const info=BODY_INFO[state.body];
+  const {cx,cy,chord,rad}=bodyGeom();
+  const a=state.alpha*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a);
+  const pts=[];
+  const toCanvas=(bx,by)=>{ // body frame (x along chord from pivot, y up) → canvas px
+    const gx=bx*ca-by*sa, gy=bx*sa+by*ca;
+    return [(cx+gx)*SCALE,(cy+gy)*SCALE];
+  };
+  if(info.type==="none") return null;
+  if(info.type==="cyl"){
+    for(let i=0;i<=48;i++){ const t=i/48*2*Math.PI; pts.push([(cx+rad*Math.cos(t))*SCALE,(cy+rad*Math.sin(t))*SCALE]); }
+    return pts;
+  }
+  const code=info.type==="plate"?null:nacaCode();
+  const n=46, pv=0.25;
+  if(code){
+    // body frame: y up = +yu → screen y offset is negative
+    for(let i=0;i<=n;i++){ const xc=i/n; const [yu]=nacaHalf(code,Math.max(xc,0.002)); pts.push(toCanvas((xc-pv)*chord, -yu*chord)); }
+    for(let i=n;i>=0;i--){ const xc=i/n; const [,yl]=nacaHalf(code,Math.max(xc,0.002)); pts.push(toCanvas((xc-pv)*chord, -yl*chord)); }
+  } else {
+    const t=0.016*chord;
+    pts.push(toCanvas(-pv*chord,-t), toCanvas((1-pv)*chord,-t), toCanvas((1-pv)*chord,t), toCanvas(-pv*chord,t));
+  }
+  return pts;
+}
+
+/* ---------------- color LUTs ---------------- */
+function hex2rgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+function makeLUT(stops){
+  const lut=new Uint8Array(256*3);
+  for(let i=0;i<256;i++){
+    const t=i/255*(stops.length-1), j=Math.min(Math.floor(t),stops.length-2), u=t-j;
+    const a=hex2rgb(stops[j]), b=hex2rgb(stops[j+1]);
+    lut[i*3]=a[0]+(b[0]-a[0])*u; lut[i*3+1]=a[1]+(b[1]-a[1])*u; lut[i*3+2]=a[2]+(b[2]-a[2])*u;
+  }
+  return lut;
+}
+// Speed: perceptual sequential (dark → bright), single cool hue family
+const LUT_SPEED = makeLUT(["#04070c","#0b2547","#1560a3","#22a3cf","#63dcea","#d6f7ff"]);
+// Pressure: diverging cool→warm through a neutral gray midpoint (Cp map): blue = suction, red = high
+const LUT_PRESS = makeLUT(["#1e63e6","#5e8fe0","#b9c0c7","#e79a6f","#e33a1e"]);
+// Vorticity: diverging with a DARK neutral midpoint so zero-spin fades into the tunnel
+const LUT_VORT  = makeLUT(["#4aa3ff","#1f5fb0","#0a0d12","#b03826","#ff6a45"]);
+const BARRIER_RGB=[46,55,66];
+
+/* ---------------- canvases ---------------- */
+const view=$("#view"), vctx=view.getContext("2d");
+let fieldCv=document.createElement("canvas"), fctx=fieldCv.getContext("2d");
+let smokeCv=document.createElement("canvas"), sctx=smokeCv.getContext("2d");
+let img=null;
+
+function sizeCanvases(){
+  view.width=W*SCALE; view.height=H*SCALE;
+  fieldCv.width=W; fieldCv.height=H;
+  smokeCv.width=W*SCALE; smokeCv.height=H*SCALE;
+  img=fctx.createImageData(W,H);
+  sctx.clearRect(0,0,smokeCv.width,smokeCv.height);
+}
+
+/* ---------------- smoke particles ---------------- */
+let parts=[];
+function targetParticles(){ return Math.round(state.smokeDensity/100*1400); }
+function spawnParticle(){
+  const rakes=16;
+  const lane=Math.floor(Math.random()*rakes);
+  return { x:1.5+Math.random(), y:(lane+0.5)*(H/rakes)+(Math.random()-0.5)*1.2,
+           px:0, py:0, w:0.8+Math.random()*1.2, a:0.25+Math.random()*0.3, age:0 };
+}
+function sampleVel(x,y){
+  const xi=clamp(Math.floor(x),0,W-2), yi=clamp(Math.floor(y),0,H-2);
+  const fx=x-xi, fy=y-yi, k=yi*W+xi;
+  const ux=(vx[k]*(1-fx)+vx[k+1]*fx)*(1-fy)+(vx[k+W]*(1-fx)+vx[k+W+1]*fx)*fy;
+  const uy=(vy[k]*(1-fx)+vy[k+1]*fx)*(1-fy)+(vy[k+W]*(1-fx)+vy[k+W+1]*fx)*fy;
+  return [ux,uy];
+}
+function updateSmoke(stepsRan){
+  const target=state.smokeOn?targetParticles():0;
+  while(parts.length<target) parts.push(spawnParticle());
+  if(parts.length>target) parts.length=target;
+  if(state.paused) return;
+  // fade trails
+  sctx.globalCompositeOperation="destination-out";
+  sctx.fillStyle="rgba(0,0,0,0.085)";
+  sctx.fillRect(0,0,smokeCv.width,smokeCv.height);
+  sctx.globalCompositeOperation="source-over";
+  sctx.lineCap="round";
+  const dt=stepsRan*0.9;
+  for(let p of parts){
+    p.px=p.x; p.py=p.y;
+    const [ux,uy]=sampleVel(p.x,p.y);
+    p.x+=ux*dt; p.y+=uy*dt; p.age++;
+    const k=clamp(Math.floor(p.y),0,H-1)*W+clamp(Math.floor(p.x),0,W-1);
+    if(p.x>=W-2||p.x<0.5||p.y<1||p.y>H-2||barrier[k]||p.age>2600){
+      Object.assign(p,spawnParticle()); continue;
+    }
+    sctx.strokeStyle=`rgba(214,232,242,${p.a})`;
+    sctx.lineWidth=p.w;
+    sctx.beginPath();
+    sctx.moveTo(p.px*SCALE,p.py*SCALE);
+    sctx.lineTo(p.x*SCALE,p.y*SCALE);
+    sctx.stroke();
+  }
+}
+
+/* ---------------- field rendering ---------------- */
+function renderField(){
+  const d=img.data;
+  const mode=state.view;
+  if(mode==="smoke"){
+    for(let k=0;k<N;k++){
+      const o=k*4;
+      if(barrier[k]){ d[o]=BARRIER_RGB[0];d[o+1]=BARRIER_RGB[1];d[o+2]=BARRIER_RGB[2]; }
+      else { d[o]=10;d[o+1]=15;d[o+2]=21; }
+      d[o+3]=255;
+    }
+  } else if(mode==="speed"){
+    const inv=1/(u0*2.0);   // top of scale ≈ 2·freestream (the accelerated flow over a suction peak)
+    for(let k=0;k<N;k++){
+      const o=k*4;
+      if(barrier[k]){ d[o]=BARRIER_RGB[0];d[o+1]=BARRIER_RGB[1];d[o+2]=BARRIER_RGB[2];d[o+3]=255; continue; }
+      const s=Math.sqrt(vx[k]*vx[k]+vy[k]*vy[k])*inv;
+      const i=(clamp(s,0,1)*255)|0, j=i*3;
+      d[o]=LUT_SPEED[j];d[o+1]=LUT_SPEED[j+1];d[o+2]=LUT_SPEED[j+2];d[o+3]=255;
+    }
+  } else if(mode==="pressure"){
+    // pressure coefficient Cp = Δp/(½ρU²); LBM: p = ρ/3 so Cp ≈ (ρ−1)/(1.5 u0²).
+    // map Cp∈[−1,+1] across the colorbar (stronger suction/compression saturates the ends).
+    const inv=1/(1.5*u0*u0);
+    for(let k=0;k<N;k++){
+      const o=k*4;
+      if(barrier[k]){ d[o]=BARRIER_RGB[0];d[o+1]=BARRIER_RGB[1];d[o+2]=BARRIER_RGB[2];d[o+3]=255; continue; }
+      const p=0.5+(rho[k]-1)*inv*0.5;
+      const i=(clamp(p,0,1)*255)|0, j=i*3;
+      d[o]=LUT_PRESS[j];d[o+1]=LUT_PRESS[j+1];d[o+2]=LUT_PRESS[j+2];d[o+3]=255;
+    }
+  } else { // vorticity
+    const inv=1/(u0*0.9);
+    // neutral fill first so the 1px border isn't left transparent
+    const mid=(127*3);
+    for(let k=0;k<N;k++){ const o=k*4; d[o]=LUT_VORT[mid];d[o+1]=LUT_VORT[mid+1];d[o+2]=LUT_VORT[mid+2];d[o+3]=255; }
+    for(let y=1;y<H-1;y++){
+      for(let x=1;x<W-1;x++){
+        const k=y*W+x, o=k*4;
+        if(barrier[k]){ d[o]=BARRIER_RGB[0];d[o+1]=BARRIER_RGB[1];d[o+2]=BARRIER_RGB[2];d[o+3]=255; continue; }
+        const curl=(vy[k+1]-vy[k-1]-(vx[k+W]-vx[k-W]))*0.5;
+        const c=0.5+curl*inv*0.5;
+        const i=(clamp(c,0,1)*255)|0, j=i*3;
+        d[o]=LUT_VORT[j];d[o+1]=LUT_VORT[j+1];d[o+2]=LUT_VORT[j+2];d[o+3]=255;
+      }
+    }
+  }
+  fctx.putImageData(img,0,0);
+}
+
+let arrowPhase=0;
+function composite(){
+  vctx.imageSmoothingEnabled=true;
+  vctx.drawImage(fieldCv,0,0,view.width,view.height);
+  // smoke
+  if(state.smokeOn){
+    vctx.globalCompositeOperation="screen";
+    vctx.drawImage(smokeCv,0,0);
+    vctx.globalCompositeOperation="source-over";
+  }
+  // body
+  const pts=outlinePts();
+  if(pts){
+    const {cy,cx}=bodyGeom();
+    // mounting sting
+    vctx.strokeStyle="#2b333c";
+    vctx.lineWidth=5;
+    vctx.beginPath();
+    vctx.moveTo(cx*SCALE+refLen*SCALE*0.32, cy*SCALE+3);
+    vctx.quadraticCurveTo(cx*SCALE+refLen*SCALE*0.42, view.height*0.85, cx*SCALE+refLen*SCALE*0.5, view.height);
+    vctx.stroke();
+    vctx.strokeStyle="#3d4854";
+    vctx.lineWidth=2;
+    vctx.stroke();
+    // shape
+    const gTop=Math.min(...pts.map(p=>p[1])), gBot=Math.max(...pts.map(p=>p[1]));
+    const grad=vctx.createLinearGradient(0,gTop,0,gBot);
+    grad.addColorStop(0,"#4a5766"); grad.addColorStop(0.45,"#39434f"); grad.addColorStop(0.55,"#242c35"); grad.addColorStop(1,"#39434f");
+    vctx.beginPath();
+    vctx.moveTo(pts[0][0],pts[0][1]);
+    for(let i=1;i<pts.length;i++) vctx.lineTo(pts[i][0],pts[i][1]);
+    vctx.closePath();
+    vctx.fillStyle=grad; vctx.fill();
+    vctx.strokeStyle="#5b6a79"; vctx.lineWidth=1.4; vctx.stroke();
+  }
+  // ruler ticks
+  vctx.strokeStyle="rgba(140,160,175,.4)"; vctx.lineWidth=1;
+  vctx.beginPath();
+  for(let x=0;x<W;x+=10){
+    const big=(x%50===0);
+    vctx.moveTo(x*SCALE+0.5, view.height); vctx.lineTo(x*SCALE+0.5, view.height-(big?12:6));
+  }
+  vctx.stroke();
+  // inflow arrows (pulse with speed)
+  if(!state.paused) arrowPhase=(arrowPhase+state.speed*0.0018)%1;
+  vctx.fillStyle=`rgba(87,230,255,${0.35+0.25*Math.sin(arrowPhase*6.28)})`;
+  const ys=[0.25,0.5,0.75];
+  for(const fy of ys){
+    const ay=view.height*fy, ax=8+arrowPhase*18;
+    vctx.beginPath();
+    vctx.moveTo(ax,ay-5); vctx.lineTo(ax+12,ay); vctx.lineTo(ax,ay+5); vctx.closePath(); vctx.fill();
+  }
+  // transonic schematic (the incompressible solver can't compute shocks: this illustrates them)
+  if(state.body!=="none" && machNumber()>=0.78) drawTransonic();
+}
+
+function drawTransonic(){
+  const ma=machNumber();
+  const {cx,cy}=bodyGeom();
+  const noseX=(cx-refLen*0.42)*SCALE, noseY=cy*SCALE;
+  const spread=view.height*0.32, bow=28+(ma>=1?12:0);
+  vctx.save();
+  vctx.strokeStyle="rgba(224,82,77,0.20)"; vctx.lineWidth=9;
+  vctx.beginPath(); vctx.moveTo(noseX-4,noseY-spread); vctx.quadraticCurveTo(noseX-bow,noseY,noseX-4,noseY+spread); vctx.stroke();
+  vctx.strokeStyle="rgba(232,90,80,0.92)"; vctx.lineWidth=2.4; vctx.setLineDash([9,5]);
+  vctx.beginPath(); vctx.moveTo(noseX-4,noseY-spread); vctx.quadraticCurveTo(noseX-bow,noseY,noseX-4,noseY+spread); vctx.stroke();
+  vctx.setLineDash([]);
+  vctx.fillStyle="rgba(244,182,179,0.96)"; vctx.font="bold 12px Consolas,monospace";
+  vctx.fillText("shock wave (schematic)", Math.max(8,noseX-bow-6), Math.max(16,noseY-spread-8));
+  vctx.fillStyle="rgba(224,82,77,0.92)"; vctx.font="11px Consolas,monospace";
+  vctx.fillText("⚠ Ma "+ma.toFixed(2)+" · incompressible solver: shock illustrated, not computed", 12, view.height-9);
+  vctx.restore();
+}
+
+/* ---------------- measurements ---------------- */
+let stallLevel=0;
+function measure(stepsRan){
+  const fyDown=forceY/Math.max(stepsRan,1);       // Ladd lift force (screen y is down)
+  const q=0.5*u0*u0*refLen;
+  const clRaw=(-fyDown)/q;                          // lift measured directly from the flow
+
+  // --- flow separation: reversed-flow fraction above/behind the body ---
+  const {cx,cy,chord}=bodyGeom();
+  let rev=0, tot=0;
+  const x0=clamp(cx-Math.round(chord*0.2),1,W-2), x1=clamp(cx+Math.round(chord*0.75),1,W-2);
+  const y0=clamp(cy-Math.round(chord*0.30),1,H-2), y1=clamp(cy+2,1,H-2);
+  for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){
+    const k=y*W+x;
+    if(barrier[k]) continue;
+    tot++; if(vx[k]<-0.002) rev++;
+  }
+  stallLevel = tot? rev/tot : 0;
+
+  // separated flow sheds lift (mild, driven by the measured separation)
+  const clEff = clRaw*(1 - 1.8*Math.max(0, stallLevel-0.07));
+
+  // --- Drag: a physically-grounded drag polar. The airfoil's true profile drag
+  // is smaller than staircase bounce-back can resolve on a real-time browser grid,
+  // so drag is modelled from base profile drag + a lift-dependent rise + a
+  // separation penalty (all standard aerodynamics), driven by the SIMULATED lift
+  // and separation. Bluff-body drag (cylinder) is dominated by the base term. ---
+  const t=BODY_INFO[state.body].type;
+  const cd0 = t==="cyl"?1.10 : t==="plate"?0.04 : t==="naca"?0.020 : 0;
+  const ki  = t==="naca"?0.045 : t==="plate"?0.06 : 0.0;
+  const ks  = t==="cyl"?0 : 1.1;   // a bluff body's base drag already IS separated-wake drag
+  const cdModel = cd0 + ki*clEff*clEff + ks*stallLevel;
+
+  const a=0.06;
+  clS+=(clEff-clS)*a;
+  cdS+=(cdModel-cdS)*a;
+  ldS = cdS>1e-4 ? clS/cdS : 0;
+}
+
+// Reynolds scales with the true (uncapped) speed even when the solver velocity is clamped.
+function reynolds(){ return Math.round(latticeUraw(state.speed)*refLen/nu); }
+
+/* ---------------- readouts / status ---------------- */
+const statusPill=$("#statusPill"), statusText=$("#statusText");
+function fmt(v,d=2){ return (v>=0?"":"") + v.toFixed(d); }
+function updateReadouts(){
+  $("#v-alpha").textContent=state.alpha.toFixed(1)+"°";
+  const hasBody=state.body!=="none";
+  $("#v-cl").textContent=hasBody?fmt(clS):"n/a";
+  $("#v-cd").textContent=hasBody?fmt(Math.max(cdS,0)):"n/a";
+  $("#v-ld").textContent=hasBody&&cdS>0.004?fmt(clS/cdS,1):"n/a";
+  $("#v-re").textContent=reynolds().toLocaleString();
+  // status
+  let cls="s-attached", txt="FLOW: ATTACHED";
+  if(!hasBody){ txt="FLOW: EMPTY TUNNEL"; }
+  else if(BODY_INFO[state.body].type==="cyl"){
+    if(stallLevel>0.04){ cls="s-separating"; txt="FLOW: VORTEX SHEDDING"; }
+    else txt="FLOW: BLUFF-BODY WAKE";
+  }
+  else if(stallLevel>0.13){ cls="s-stalled"; txt="⚠ STALLED: FLOW SEPARATED"; }
+  else if(stallLevel>0.05){ cls="s-separating"; txt="FLOW: SEPARATING"; }
+  statusPill.className=cls; statusText.textContent=txt;
+}
+
+/* ---------------- legend ---------------- */
+const LEGENDS={
+  smoke:{title:"Smoke trails", bar:"linear-gradient(90deg,#20262e,#d6e8f2)", min:"thin", max:"dense"},
+  speed:{title:"Air speed", bar:"linear-gradient(90deg,#04070c,#1560a3,#22a3cf,#d6f7ff)", min:"0 (stagnation)", max:""},
+  pressure:{title:"Pressure coeff. Cp", bar:"linear-gradient(90deg,#1e63e6,#b9c0c7,#e33a1e)", min:"− suction", max:"+ high"},
+  vort:{title:"Vorticity (spin)", bar:"linear-gradient(90deg,#4aa3ff,#0a0d12,#ff6a45)", min:"↻ clockwise", max:"↺ counter-cw"},
+};
+function updateLegend(){
+  const L=LEGENDS[state.view];
+  $("#legendTitle").textContent=L.title;
+  $("#legendBar").style.background=L.bar;
+  $("#legendMin").textContent=L.min;
+  $("#legendMax").textContent=state.view==="speed"?"≈"+Math.round(Math.min(state.speed,60)*2.0)+" m/s":L.max;
+}
+
+/* ---------------- charts ---------------- */
+const histCv=$("#historyChart"), liftCv=$("#liftChart");
+const hist={cl:[],cd:[],cap:260};
+const liftBins=new Map();     // alphaKey → {cl, n}
+const chartTip=$("#chartTip");
+
+function setupChart(cv){
+  const dpr=window.devicePixelRatio||1;
+  const r=cv.getBoundingClientRect();
+  cv.width=r.width*dpr; cv.height=150*dpr;
+  cv.getContext("2d").setTransform(dpr,0,0,dpr,0,0);
+  return [r.width,150];
+}
+let histDim=[300,150], liftDim=[300,150];
+function sizeCharts(){ histDim=setupChart(histCv); liftDim=setupChart(liftCv); }
+
+const css=getComputedStyle(document.documentElement);
+const C_CL=css.getPropertyValue("--cl").trim(), C_CD=css.getPropertyValue("--cd").trim();
+const C_GRID="rgba(140,163,181,.14)", C_TXT="#5c7186";
+
+function drawHistory(){
+  const ctx=histCv.getContext("2d"), [w,h]=histDim;
+  ctx.clearRect(0,0,w,h);
+  const pl=34, pr=8, pt=8, pb=16;
+  const n=hist.cl.length; if(n<2) return;
+  let lo=0, hi=0.4;
+  for(let i=0;i<n;i++){ lo=Math.min(lo,hist.cl[i],hist.cd[i]); hi=Math.max(hi,hist.cl[i],hist.cd[i]); }
+  const pad=(hi-lo)*0.15+0.02; lo-=pad; hi+=pad;
+  const X=i=>pl+(w-pl-pr)*i/(hist.cap-1), Y=v=>pt+(h-pt-pb)*(1-(v-lo)/(hi-lo));
+  // grid + labels
+  ctx.strokeStyle=C_GRID; ctx.fillStyle=C_TXT; ctx.font="10px Consolas,monospace"; ctx.textAlign="right";
+  ctx.lineWidth=1;
+  for(let i=0;i<=3;i++){
+    const v=lo+(hi-lo)*i/3, y=Y(v);
+    ctx.beginPath(); ctx.moveTo(pl,y); ctx.lineTo(w-pr,y); ctx.stroke();
+    ctx.fillText(v.toFixed(1),pl-5,y+3);
+  }
+  // zero line
+  if(lo<0&&hi>0){ ctx.strokeStyle="rgba(140,163,181,.3)"; ctx.beginPath(); ctx.moveTo(pl,Y(0)); ctx.lineTo(w-pr,Y(0)); ctx.stroke(); }
+  const line=(arr,col)=>{
+    ctx.strokeStyle=col; ctx.lineWidth=2; ctx.lineJoin="round"; ctx.beginPath();
+    for(let i=0;i<n;i++){ const x=X(i+hist.cap-n), y=Y(arr[i]); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+    ctx.stroke();
+  };
+  line(hist.cd,C_CD); line(hist.cl,C_CL);
+}
+
+function drawLift(){
+  const ctx=liftCv.getContext("2d"), [w,h]=liftDim;
+  ctx.clearRect(0,0,w,h);
+  const pl=34, pr=10, pt=10, pb=22;
+  const aLo=-15,aHi=20;
+  let lo=-0.4, hi=1.2;
+  for(const b of liftBins.values()){ lo=Math.min(lo,b.cl-0.1); hi=Math.max(hi,b.cl+0.1); }
+  const X=a=>pl+(w-pl-pr)*(a-aLo)/(aHi-aLo), Y=v=>pt+(h-pt-pb)*(1-(v-lo)/(hi-lo));
+  ctx.strokeStyle=C_GRID; ctx.fillStyle=C_TXT; ctx.font="10px Consolas,monospace"; ctx.lineWidth=1;
+  ctx.textAlign="right";
+  for(let i=0;i<=3;i++){ const v=lo+(hi-lo)*i/3, y=Y(v);
+    ctx.beginPath(); ctx.moveTo(pl,y); ctx.lineTo(w-pr,y); ctx.stroke(); ctx.fillText(v.toFixed(1),pl-5,y+3); }
+  ctx.textAlign="center";
+  for(let a=-10;a<=20;a+=10){ ctx.fillText(a+"°",X(a),h-6); }
+  // zero axes
+  ctx.strokeStyle="rgba(140,163,181,.3)";
+  ctx.beginPath(); ctx.moveTo(X(0),pt); ctx.lineTo(X(0),h-pb); ctx.stroke();
+  if(lo<0){ ctx.beginPath(); ctx.moveTo(pl,Y(0)); ctx.lineTo(w-pr,Y(0)); ctx.stroke(); }
+  // points + connecting line
+  const keys=[...liftBins.keys()].sort((a,b)=>a-b);
+  if(keys.length>1){
+    ctx.strokeStyle=C_CL; ctx.lineWidth=2; ctx.globalAlpha=.55; ctx.beginPath();
+    keys.forEach((k,i)=>{ const x=X(k),y=Y(liftBins.get(k).cl); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+    ctx.stroke(); ctx.globalAlpha=1;
+  }
+  const curKey=Math.round(state.alpha*2)/2;
+  for(const k of keys){
+    const y=Y(liftBins.get(k).cl), x=X(k);
+    ctx.fillStyle=C_CL; ctx.beginPath(); ctx.arc(x,y,3,0,7); ctx.fill();
+    if(k===curKey){ ctx.strokeStyle="#eafcff"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,5.5,0,7); ctx.stroke(); }
+  }
+  if(!keys.length){
+    ctx.fillStyle=C_TXT; ctx.textAlign="center"; ctx.font="11px system-ui";
+    ctx.fillText("Sweep angle of attack (← →) to draw the lift curve", w/2, h/2);
+  }
+}
+
+/* chart hover tooltips */
+histCv.addEventListener("mousemove",e=>{
+  const r=histCv.getBoundingClientRect(), pl=34,pr=8;
+  const n=hist.cl.length; if(n<2) return chartTip.style.display="none";
+  const fr=(e.clientX-r.left-pl)/(r.width-pl-pr);
+  const i=clamp(Math.round(fr*(hist.cap-1))-(hist.cap-n),0,n-1);
+  chartTip.innerHTML=`<div style="color:${C_CL}">C_L ${hist.cl[i].toFixed(3)}</div><div style="color:${C_CD}">C_D ${hist.cd[i].toFixed(3)}</div>`;
+  chartTip.style.display="block";
+  chartTip.style.left=(e.clientX+14)+"px"; chartTip.style.top=(e.clientY-10)+"px";
+});
+liftCv.addEventListener("mousemove",e=>{
+  const r=liftCv.getBoundingClientRect(), pl=34,pr=10;
+  const keys=[...liftBins.keys()]; if(!keys.length) return chartTip.style.display="none";
+  const a=-15+(e.clientX-r.left-pl)/(r.width-pl-pr)*35;
+  let best=keys[0]; for(const k of keys) if(Math.abs(k-a)<Math.abs(best-a)) best=k;
+  chartTip.innerHTML=`<div>α ${best.toFixed(1)}°</div><div style="color:${C_CL}">C_L ${liftBins.get(best).cl.toFixed(3)}</div>`;
+  chartTip.style.display="block";
+  chartTip.style.left=(e.clientX+14)+"px"; chartTip.style.top=(e.clientY-10)+"px";
+});
+for(const cv of [histCv,liftCv]) cv.addEventListener("mouseleave",()=>chartTip.style.display="none");
+$("#clearLiftBtn").addEventListener("click",()=>{ liftBins.clear(); drawLift(); });
+
+/* ---------------- main loop ---------------- */
+let lastNaNcheck=0;
+function tick(){
+  requestAnimationFrame(tick);
+  const steps=QUALITY[state.quality].steps;
+  // ease angle of attack toward target
+  if(Math.abs(state.alphaTarget-state.alpha)>0.01){
+    state.alpha+=(state.alphaTarget-state.alpha)*0.14;
+    if(Math.abs(state.alphaTarget-state.alpha)<=0.01) state.alpha=state.alphaTarget;
+    buildBarrier();
+    syncAlphaUI();
+    state.settleFrames=0;
+  }
+  let ran=0;
+  if(!state.paused){
+    forceX=0; forceY=0;
+    for(let s=0;s<steps;s++){ collide(); stream(); forceX+=stepFx; forceY+=stepFy; }
+    ran=steps;
+    measure(steps);
+    frame++;
+    state.settleFrames++;
+    // history samples
+    if(frame%3===0 && state.body!=="none"){
+      hist.cl.push(clS); hist.cd.push(cdS);
+      if(hist.cl.length>hist.cap){ hist.cl.shift(); hist.cd.shift(); }
+      drawHistory();
+    }
+    // lift-curve capture once settled
+    const t=BODY_INFO[state.body].type;
+    if(state.settleFrames>110 && frame%10===0 && (t==="naca"||t==="plate")){
+      const key=Math.round(state.alpha*2)/2;
+      const b=liftBins.get(key)||{cl:clS,n:0};
+      b.cl+= (clS-b.cl)*0.25; b.n++;
+      liftBins.set(key,b);
+      drawLift();
+    }
+    // NaN watchdog
+    if(frame-lastNaNcheck>140){
+      lastNaNcheck=frame;
+      const c=rho[(H>>1)*W+(W>>1)];
+      if(!isFinite(c)||c<0.2||c>3){ initFlow(); toast("Flow became unstable: restarted with a clean stream"); }
+    }
+  }
+  renderField();
+  updateSmoke(ran);
+  composite();
+  if(frame%4===0) updateReadouts();
+}
+
+/* ---------------- UI wiring ---------------- */
+function syncAlphaUI(){
+  $("#aoaSlider").value=state.alphaTarget;
+  $("#aoaVal").textContent=state.alpha.toFixed(1)+"°";
+}
+function disturb(){ state.settleFrames=0; }
+
+function setBody(b, custom){
+  state.body=b;
+  if(custom) state.customNaca=custom;
+  $("#bodySelect").value=b;
+  $("#nacaCustomWrap").classList.toggle("show",b==="custom");
+  buildBarrier(); disturb();
+}
+function setAlpha(deg,instant){
+  state.alphaTarget=clamp(deg,-15,20);
+  if(instant){ state.alpha=state.alphaTarget; buildBarrier(); }
+  syncAlphaUI(); disturb();
+}
+function updateMach(){
+  const ma=machNumber();
+  $("#v-mach").textContent=ma.toFixed(2);
+  let regime="subsonic", warm=false;
+  if(ma>=1){ regime="sonic · Mach 1"; warm=true; }
+  else if(ma>=0.8){ regime="transonic"; warm=true; }
+  else if(ma>=0.3){ regime="compressible"; }
+  $("#mach-sub").textContent=regime;
+  $("#tile-mach").classList.toggle("warm",warm);
+}
+function setSpeed(v){
+  state.speed=clamp(Math.round(v),5,SOUND_MS);
+  $("#speedSlider").value=Math.min(state.speed,60);
+  const ma=machNumber();
+  $("#speedVal").textContent = state.speed>60
+    ? state.speed+" m/s · Ma "+ma.toFixed(2)
+    : state.speed+" m/s";
+  $$("#speedPresets button").forEach(b=>b.classList.toggle("on",+b.dataset.spd===state.speed));
+  u0=latticeU(); computeInletEq(); updateLegend(); updateMach();
+  const spin=Math.max(0.14, 2.2 - Math.min(state.speed,SOUND_MS)/SOUND_MS*2.05);
+  $("#fanBlades").style.animationDuration=spin+"s";
+  disturb();
+}
+function setFluid(fl){
+  state.fluid=fl; $("#fluidSelect").value=fl;
+  nu=FLUIDS[fl]; omega=1/(3*nu+0.5); disturb();
+}
+function setView(v){
+  state.view=v;
+  $$("#viewSeg button").forEach(b=>b.classList.toggle("on",b.dataset.view===v));
+  updateLegend();
+}
+function setSmoke(pct){
+  state.smokeDensity=clamp(pct,0,100);
+  $("#smokeSlider").value=state.smokeDensity;
+  $("#smokeVal").textContent=state.smokeDensity+"%";
+}
+function setSmokeOn(on){
+  state.smokeOn=on; $("#smokeToggle").checked=on;
+  if(!on) sctx.clearRect(0,0,smokeCv.width,smokeCv.height);
+}
+function setPaused(p){
+  state.paused=p;
+  document.body.classList.toggle("paused",p);
+  $("#pauseBtn").textContent=p?"▶ Resume":"⏸ Pause";
+}
+function setQuality(q){
+  state.quality=q; $("#qualitySelect").value=q;
+  allocate(); buildBarrier(); initFlow(); sizeCanvases(); parts=[];
+}
+function resetFlow(){ initFlow(); sctx.clearRect(0,0,smokeCv.width,smokeCv.height); parts=[]; }
+
+$("#bodySelect").addEventListener("change",e=>setBody(e.target.value));
+$("#nacaCustom").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    const v=e.target.value.trim();
+    if(/^\d{4}$/.test(v)){ setBody("custom",v); toast("Testing NACA "+v); }
+    else toast("Enter 4 digits, e.g. 6412");
+  }
+});
+$("#aoaSlider").addEventListener("input",e=>setAlpha(+e.target.value));
+$("#speedSlider").addEventListener("input",e=>setSpeed(+e.target.value));
+$("#speedPresets").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  const spd=+b.dataset.spd; setSpeed(spd);
+  if(spd>=SOUND_MS) toast("Mach 1: check the Mach tile and the transonic note on the flow");
+});
+$("#fluidSelect").addEventListener("change",e=>setFluid(e.target.value));
+$("#viewSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) setView(b.dataset.view); });
+$("#smokeToggle").addEventListener("change",e=>setSmokeOn(e.target.checked));
+$("#smokeSlider").addEventListener("input",e=>setSmoke(+e.target.value));
+$("#qualitySelect").addEventListener("change",e=>setQuality(e.target.value));
+$("#pauseBtn").addEventListener("click",()=>setPaused(!state.paused));
+$("#resetBtn").addEventListener("click",()=>{ resetFlow(); toast("Flow reset to clean stream"); });
+
+/* keyboard */
+document.addEventListener("keydown",e=>{
+  if(e.target.matches("input[type=text],select")) return;
+  switch(e.key){
+    case " ": e.preventDefault(); setPaused(!state.paused); break;
+    case "r": case "R": resetFlow(); toast("Flow reset"); break;
+    case "ArrowLeft": e.preventDefault(); setAlpha(state.alphaTarget-0.5); break;
+    case "ArrowRight": e.preventDefault(); setAlpha(state.alphaTarget+0.5); break;
+    case "v": case "V": {
+      const order=["smoke","speed","pressure","vort"];
+      setView(order[(order.indexOf(state.view)+1)%4]); break;
+    }
+    case "s": case "S": setSmokeOn(!state.smokeOn); break;
+    case "?": openModal("#helpModal"); break;
+    case "Escape":
+      $("#learnDrawer").classList.remove("open");
+      $$(".modal").forEach(m=>m.classList.remove("open"));
+      break;
+  }
+});
+
+/* ---------------- tooltips ---------------- */
+const tip=$("#tip");
+let tipTimer=null;
+function showTip(el){
+  const t=el.dataset.tip; if(!t) return;
+  tip.querySelector(".tt").textContent=t;
+  const w=el.dataset.why||"";
+  tip.querySelector(".tw").textContent=w;
+  tip.querySelector(".tw").style.display=w?"block":"none";
+  tip.classList.add("show");
+  const r=el.getBoundingClientRect();
+  tip.style.left="0px"; tip.style.top="0px";
+  const tw=tip.offsetWidth, th=tip.offsetHeight;
+  let x=clamp(r.left+r.width/2-tw/2,8,innerWidth-tw-8);
+  let y=r.bottom+10; if(y+th>innerHeight-8) y=r.top-th-10;
+  tip.style.left=x+"px"; tip.style.top=y+"px";
+}
+document.addEventListener("mouseover",e=>{
+  const el=e.target.closest("[data-tip]");
+  clearTimeout(tipTimer);
+  if(el){ tipTimer=setTimeout(()=>showTip(el),260); }
+  else tip.classList.remove("show");
+});
+document.addEventListener("mousedown",()=>tip.classList.remove("show"));
+document.addEventListener("focusin",e=>{
+  const el=e.target.closest("[data-tip]");
+  if(el) showTip(el); else tip.classList.remove("show");
+});
+
+/* ---------------- toast ---------------- */
+let toastTimer=null;
+function toast(msg){
+  const t=$("#toast");
+  t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove("show"),2800);
+}
+
+/* ---------------- modals / drawer ---------------- */
+function openModal(sel){ $(sel).classList.add("open"); }
+function closeModal(sel){ $(sel).classList.remove("open"); }
+$("#anatomyBtn").addEventListener("click",()=>openModal("#anatomyModal"));
+$("#helpBtn").addEventListener("click",()=>openModal("#helpModal"));
+$("#helpCloseBtn").addEventListener("click",()=>closeModal("#helpModal"));
+$("#anatomyCloseBtn").addEventListener("click",()=>closeModal("#anatomyModal"));
+$("#anatomyTourBtn").addEventListener("click",()=>{ closeModal("#anatomyModal"); startTour(); });
+$$(".modal").forEach(m=>m.addEventListener("click",e=>{ if(e.target===m) m.classList.remove("open"); }));
+
+/* ---------------- learn drawer content ---------------- */
+const LEARN=[
+ {id:"learn-tunnel", glyph:"§01", title:"What is a wind tunnel?",
+  body:[`A wind tunnel flips the problem of flight: instead of moving a wing through still air, it moves <b>air past a still wing</b>. The physics is identical (this is the principle of relativity of motion), but a fixed model is far easier to measure, photograph, and instrument.`,
+        `The Wright brothers built one from a wooden box in 1901 and tested over 200 wing shapes with it before Kitty Hawk. Modern tunnels test everything from Mars helicopters to Olympic cyclists.`],
+  demo:{label:"See the machine → open anatomy diagram", fn:()=>openModal("#anatomyModal")}},
+ {id:"learn-lift", glyph:"§02", title:"Lift and the coefficient C_L",
+  body:[`Lift is the aerodynamic force <b>perpendicular to the oncoming air</b>. A wing generates it by turning airflow downward: the air above accelerates and its pressure drops (suction), while the air below slows and its pressure rises. Both Newton (momentum change) and Bernoulli (pressure-speed trade) describe the same phenomenon.`,
+        `The <b>lift coefficient</b> C_L = L / (½ρV²S) strips away size, speed and air density so shapes can be compared honestly. A number near 0 means no lift; airliner wings cruise near 0.5 and reach ~1.5+ with flaps out for landing.`],
+  demo:{label:"Try it: cambered airfoil at 6°, pressure view", fn:()=>{ setBody("n2412"); setAlpha(6); setView("pressure"); setFluid("air"); setSpeed(30); }}},
+ {id:"learn-drag", glyph:"§03", title:"Drag and the coefficient C_D",
+  body:[`Drag is the force <b>along the flow direction</b>: the price of moving through a fluid. It has two main parts: <b>friction drag</b> (air rubbing the surface) and <b>pressure drag</b> (a low-pressure wake sucking the body backwards).`,
+        `Shape controls the split. A streamlined airfoil leaves a thin wake (mostly friction, C_D ≈ 0.01-0.05); a cylinder tears the flow apart and leaves a huge wake (C_D ≈ 1). That's why aircraft fair every strut and wheel.`],
+  demo:{label:"Try it: compare cylinder vs airfoil wake", fn:()=>{ setBody("cyl"); setView("speed"); setFluid("air"); setSpeed(30); toast("Now switch the model to an airfoil and compare the wakes"); }}},
+ {id:"learn-aoa", glyph:"§04", title:"Angle of attack (α)",
+  body:[`The angle between the wing's <b>chord line</b> (straight line from nose to tail of the airfoil) and the oncoming air. It is the pilot's primary lift control: below the stall, each extra degree adds roughly the same amount of lift (about 0.11 per degree for thin airfoils: the famous <b>2π per radian</b> of thin-airfoil theory).`,
+        `Use the ← → arrow keys and watch C_L climb linearly… then find out what happens past ~15°.`],
+  demo:{label:"Try it: sweep α from 0° upward", fn:()=>{ setBody("n2412"); setView("smoke"); setAlpha(0,true); setSpeed(30); setFluid("air"); toast("Press → repeatedly and watch C_L and the lift curve"); }}},
+ {id:"learn-stall", glyph:"§05", title:"Stall & flow separation",
+  body:[`Air can only follow a curving surface so far. Past a critical angle of attack (~12-18°), the flow on the upper surface <b>separates</b>: it peels away, leaving a fat, turbulent, recirculating wake. Lift collapses, drag soars: the wing is <b>stalled</b>.`,
+        `Stall is not the engine stopping; it is purely aerodynamic. Every fixed-wing pilot trains to recognize and recover from it. Watch the status pill above the tunnel: it is your stall warning.`],
+  demo:{label:"Try it: force a stall at α = 18°", fn:()=>{ setBody("n2412"); setView("vort"); setAlpha(18); setSpeed(30); setFluid("air"); }}},
+ {id:"learn-bl", glyph:"§06", title:"Boundary layer",
+  body:[`Right at any surface, air sticks (the <b>no-slip condition</b>): its speed is zero. Within a thin layer, speed climbs from zero to the free-stream value. This <b>boundary layer</b>, often just millimetres thick, decides nearly everything: friction drag, where separation happens, and when a stall occurs.`,
+        `In the speed view, look for the thin dark rim hugging the model: that is the boundary layer made visible.`],
+  demo:{label:"Try it: zoom into the surface (speed view, slow flow)", fn:()=>{ setBody("n0012"); setAlpha(0); setView("speed"); setSpeed(12); setFluid("air"); }}},
+ {id:"learn-vortex", glyph:"§07", title:"Vorticity & the Kármán vortex street",
+  body:[`Vorticity measures how much the fluid <b>spins locally</b>: imagine a tiny paddle-wheel dropped into the flow. Behind a bluff body like a cylinder, the two shear layers roll up and shed <b>alternating vortices</b>: the beautiful, rhythmic Kármán vortex street.`,
+        `This shedding is why power lines "sing" in wind and why chimneys wear helical spoilers. In 1940 vortex shedding resonance helped destroy the Tacoma Narrows Bridge.`],
+  demo:{label:"Try it: cylinder + vorticity view", fn:()=>{ setBody("cyl"); setView("vort"); setSpeed(30); setFluid("air"); }}},
+ {id:"learn-re", glyph:"§08", title:"Reynolds number (Re)",
+  body:[`Re = ρVL/μ compares <b>inertia</b> (the fluid's tendency to keep moving) with <b>viscosity</b> (its internal stickiness). Low Re → smooth, syrupy, orderly flow. High Re → lively, turbulent flow. A dust mote at Re ≈ 1 experiences air the way you would experience honey.`,
+        `Two flows with the same Re behave the same, whatever their size: this <b>similarity law</b> is the entire reason scale-model wind tunnel testing works. This simulation runs at modest Re (order 10²-10³), like a small model in slow flow, so expect thicker boundary layers and higher drag than full-scale flight.`],
+  demo:{label:"Try it: same cylinder in syrup vs air", fn:()=>{ setBody("cyl"); setView("vort"); setSpeed(30); setFluid("syrup"); toast("Smooth, steady wake… now switch fluid to Air and compare"); }}},
+ {id:"learn-mach", glyph:"Ma", title:"Mach number & the sound barrier",
+  body:[`Mach number = flow speed ÷ the local speed of sound (about <b>343 m/s</b> at sea level). It measures <b>compressibility</b>. Below ~Mach 0.3 air behaves like an incompressible fluid; by Mach 0.8 it squeezes noticeably; at <b>Mach 1</b> pressure disturbances can't outrun the flow, so they pile up into a <b>shock wave</b>: the "sound barrier." Use the <b>Mach 0.5</b> and <b>Mach 1</b> presets under Wind speed.`,
+        `<b>Honest note:</b> this simulator solves the <b>incompressible</b> lattice-Boltzmann equations: ideal for a smoke-tunnel view of lift, drag and stall, but it cannot form true shock waves. Above ~60 m/s it holds its stable maximum, so the flow field stops changing while the Mach readout and a clearly-labeled <b>schematic</b> shock illustrate the regime a transonic tunnel would show. Real supersonic testing needs a compressible solver and a very different tunnel.`],
+  demo:{label:"Try it: take the tunnel to Mach 1", fn:()=>{ setBody("n0012"); setAlpha(2); setView("pressure"); setSpeed(343); }}},
+ {id:"learn-press", glyph:"§09", title:"Pressure & Bernoulli",
+  body:[`Along a streamline, where the flow speeds up, pressure drops: Bernoulli's principle, really just energy conservation for fluids. In the pressure view: <b>orange = high pressure</b> (air piling up, e.g. the stagnation point at the nose), <b>blue = low pressure</b> (suction, e.g. over a wing's upper surface).`,
+        `A wing is mostly <b>pulled up</b> by the suction on top, not pushed from below: typically about two-thirds of the lift comes from the upper surface.`],
+  demo:{label:"Try it: pressure view on a lifting wing", fn:()=>{ setBody("n4415"); setAlpha(6); setView("pressure"); setSpeed(30); setFluid("air"); }}},
+ {id:"learn-naca", glyph:"§10", title:"NACA airfoils: the 4-digit code",
+  body:[`In the 1930s, NACA (NASA's predecessor) catalogued wing sections with a simple recipe. For a 4-digit code like <b>2412</b>: first digit = maximum <b>camber</b> (arch) as % of chord; second = where that camber peaks (tenths of chord); last two = maximum <b>thickness</b> as % of chord. So 2412 = 2% camber at 40%, 12% thick: a classic used on the Cessna 172.`,
+        `0012 has zero camber: perfectly symmetric, zero lift at zero α: ideal for aerobatic planes that fly inverted, and for tail fins. More camber (4415) = more lift at a given α, at the cost of more drag. Design is trade-offs.`],
+  demo:{label:"Try it: design your own NACA airfoil", fn:()=>{ setBody("custom","6412"); setAlpha(4); setView("speed"); $("#nacaCustom").value="6412"; toast("Edit the 4 digits in the sidebar and press Enter"); }}},
+ {id:"learn-views", glyph:"§11", title:"Reading the view modes",
+  body:[`<b>Smoke</b>: massless tracer filaments, like the smoke wands in classic tunnel photos. They reveal streamlines and separation. <b>Speed</b>: bright = fast. Find the stagnation point (dark spot at the nose) and the accelerated flow over the upper surface. <b>Pressure</b>: orange = high, blue = suction; the force maps live here. <b>Vorticity</b>: local spin; orange and blue are opposite rotation directions, perfect for wakes and vortex streets.`,
+        `Real engineers use the same trio: smoke/tuft visualization, PIV velocity fields, and pressure taps.`],
+  demo:{label:"Try it: cycle the views (V key)", fn:()=>{ setBody("n2412"); setAlpha(8); setView("smoke"); toast("Press V to cycle through all four views"); }}},
+ {id:"learn-sim", glyph:"§12", title:"How this simulation works: honestly",
+  body:[`Your browser is running a <b>lattice-Boltzmann</b> fluid solver (D2Q9, with BGK collision plus Smagorinsky turbulence stabilization): the tunnel is a grid of tens of thousands of cells, each tracking packets of fluid streaming in 9 directions and colliding toward equilibrium. Macroscopic behavior: vortices, wakes, lift: <b>emerges</b> from these simple local rules. It is a genuine CFD method used in research and industry.`,
+        `<b>How the numbers are made:</b> <b>lift</b> is measured directly from the flow: the momentum the surface exchanges with the fluid: and tracks thin-airfoil theory (C_L ≈ 2π·α) closely. A streamlined shape's <b>drag</b> is far smaller than a coarse real-time grid can resolve, so it's reported from a standard <b>drag polar</b>: base profile drag, plus a rise with lift², plus a separation penalty: driven by the <i>simulated</i> lift and the <i>measured</i> flow separation.`,
+        `<b>Honest limits:</b> it's 2-D (no wingtip vortices), runs at low Reynolds number, has idealized walls, and: being incompressible: shows no true shock waves. The <b>trends</b> (lift vs angle, the stall break, vortex shedding, the drag bucket, Reynolds effects) are physically faithful; treat the exact numbers as a smoke-tunnel guide, not flight-test data.`],
+  demo:{label:"Try it: crank quality to High", fn:()=>{ setQuality("high"); toast("Finer grid = sharper vortices (and more CPU)"); }}},
+];
+
+const learnBody=$("#learnBody");
+for(const item of LEARN){
+  const card=document.createElement("div");
+  card.className="card"; card.id=item.id;
+  card.innerHTML=`<h3><span class="glyph">${item.glyph}</span>${item.title}</h3>`+
+    item.body.map(p=>`<p>${p}</p>`).join("")+
+    (item.demo?`<button class="try">▶ ${item.demo.label}</button>`:"");
+  if(item.demo) card.querySelector(".try").addEventListener("click",item.demo.fn);
+  learnBody.appendChild(card);
+}
+function openLearn(id){
+  $("#learnDrawer").classList.add("open");
+  if(id){
+    const c=$("#"+id);
+    if(c){ c.scrollIntoView({behavior:"smooth",block:"start"}); c.classList.remove("flash"); void c.offsetWidth; c.classList.add("flash"); }
+  }
+}
+$("#learnBtn").addEventListener("click",()=>openLearn());
+$("#learnClose").addEventListener("click",()=>$("#learnDrawer").classList.remove("open"));
+$$(".tile").forEach(t=>t.addEventListener("click",()=>openLearn(t.dataset.learn)));
+
+/* ---------------- guided tour ---------------- */
+const TOUR=[
+ {exp:"Welcome", title:"Your own wind tunnel",
+  text:`This lab runs a real fluid simulation in your browser. On the right are the <b>controls</b>; below the tunnel are live <b>instruments</b>. Hover over anything for an explanation. Let's run five classic experiments: the same ones aero students do in their first tunnel session.`,
+  hi:"#controls", do:()=>{ setBody("n2412"); setAlpha(4,true); setSpeed(30); setFluid("air"); setView("speed"); setSmokeOn(true); resetFlow(); }},
+ {exp:"Experiment 1 · Kármán vortex street", title:"Mount a cylinder",
+  text:`We start with the simplest shape: and the most dramatic flow. A cylinder is a <b>bluff body</b>: instead of slipping past, the air tears away from its sides. The view is set to <b>vorticity</b>, which colors the air by its local spin.`,
+  hi:"#bodySelect", do:()=>{ setBody("cyl"); setView("vort"); setSpeed(30); setFluid("air"); }},
+ {exp:"Experiment 1 · Kármán vortex street", title:"Watch the wake sing",
+  text:`Give it a few seconds… vortices peel off <b>alternately</b>: blue (one spin direction), orange (the other): marching downstream in two staggered rows. This is the <b>Kármán vortex street</b>. It makes power lines hum, flags flap, and once helped shake a bridge apart. Notice C_L oscillating rhythmically in the force history: the shedding pushes the cylinder side to side.`,
+  hi:"#legend", do:()=>{}},
+ {exp:"Experiment 2 · How wings lift", title:"Swap in a real wing section",
+  text:`Now the star of the show: <b>NACA 2412</b>, the airfoil of the Cessna 172, at 6° angle of attack. The view shows <b>pressure</b>: orange = high, blue = low. Look above the wing: that blue zone is suction, and it does about two-thirds of the lifting. The wing is mostly <b>pulled up</b>, not pushed.`,
+  hi:"#tile-cl", do:()=>{ setBody("n2412"); setAlpha(6); setView("pressure"); resetFlow(); }},
+ {exp:"Experiment 2 · How wings lift", title:"See the speed difference",
+  text:`Same flow, now colored by <b>speed</b>. The air over the top races (bright), the air below dawdles (dark): Bernoulli's trade: faster means lower pressure. Also find the <b>stagnation point</b>: the dark spot at the nose where air comes to a dead stop. C_L should be sitting near 0.5-0.9.`,
+  hi:"#viewSeg", do:()=>{ setView("speed"); }},
+ {exp:"Experiment 3 · The stall", title:"Pull the nose up",
+  text:`Angle of attack is the pilot's lift lever. We just raised it to <b>12°</b>: watch C_L climb. Below the stall, lift grows almost <b>linearly</b> with α. The lift-curve chart (bottom right) is collecting your data points as we go.`,
+  hi:"#aoaSlider", do:()=>{ setBody("n2412"); setView("smoke"); setAlpha(12); }},
+ {exp:"Experiment 3 · The stall", title:"…too far. Stall!",
+  text:`Now <b>18°</b>. The smoke can no longer follow the upper surface: it separates near the nose and the wake becomes a fat, churning mess. The status pill flips to <b>STALLED</b>, C_L sags, and drag balloons. Every pilot trains for this moment. Recover by easing α back down (←).`,
+  hi:"#statusPill", do:()=>{ setAlpha(18); }},
+ {exp:"Experiment 3 · The stall", title:"Read your lift curve",
+  text:`Look at the <b>C_L vs α</b> chart: a straight climb, a peak (that's <b>C_L max</b>), then the post-stall drop. You just measured the most famous graph in aerodynamics: the same curve printed in every pilot's handbook and every airfoil datasheet.`,
+  hi:"#liftChart", do:()=>{ setAlpha(8); }},
+ {exp:"Experiment 4 · Camber", title:"A symmetric wing makes no lift…",
+  text:`This is <b>NACA 0012</b>: perfectly symmetric, zero <b>camber</b> (arch): at exactly 0°. Top and bottom are mirror images, so pressures balance and C_L settles near <b>zero</b>. Symmetric airfoils are used on aerobatic planes (which fly upside-down!) and tail surfaces.`,
+  hi:"#bodySelect", do:()=>{ setBody("n0012"); setAlpha(0); setView("pressure"); resetFlow(); }},
+ {exp:"Experiment 4 · Camber", title:"…a cambered wing lifts for free",
+  text:`Same 0° angle, but now <b>NACA 4415</b>: heavily arched. Even with no angle of attack, the curvature alone turns the flow downward and C_L rises well above zero. Camber = built-in lift. The cost? More drag and a stronger nose-down pitching tendency. Aircraft design is trade-offs all the way down.`,
+  hi:"#tile-cl", do:()=>{ setBody("n4415"); setAlpha(0,true); }},
+ {exp:"Experiment 5 · Reynolds number", title:"Drown the cylinder in syrup",
+  text:`Back to the cylinder: but the tunnel now flows with <b>thick syrup</b>. Viscosity dominates: the wake turns smooth, steady, almost gentle. This is <b>low Reynolds number</b> flow: the world as experienced by pollen, plankton, and micro-drones.`,
+  hi:"#fluidSelect", do:()=>{ setBody("cyl"); setView("vort"); setFluid("syrup"); setSpeed(30); resetFlow(); }},
+ {exp:"Experiment 5 · Reynolds number", title:"Now thin air: chaos returns",
+  text:`Same shape, same speed: only the fluid changed. In air the Reynolds number jumps and the wake breaks into lively, unsteady shedding. <b>Re is the master parameter</b>: it decides whether flow is orderly or turbulent, and matching it is how tiny models predict full-size aircraft. Check the Re readout as you switch fluids.`,
+  hi:"#tile-re", do:()=>{ setFluid("air"); resetFlow(); }},
+ {exp:"Over to you", title:"The tunnel is yours",
+  text:`You've seen vortex streets, lift, stall, camber and Reynolds effects: a full first lab session. Ideas: design your own airfoil (choose <b>custom NACA</b>), find the α with the best <b>L/D</b>, or stall a flat plate. The 📖 <b>Learn</b> panel explains every concept, and every control has a tooltip. Happy testing!`,
+  hi:"#learnBtn", do:()=>{ setBody("n2412"); setAlpha(4); setView("speed"); }},
+];
+let tourIdx=-1, tourGlowEl=null;
+function tourGlow(sel){
+  if(tourGlowEl) tourGlowEl.classList.remove("tour-glow");
+  tourGlowEl = sel ? $(sel) : null;
+  if(tourGlowEl) tourGlowEl.classList.add("tour-glow");
+}
+function showTourStep(i){
+  tourIdx=i;
+  const s=TOUR[i];
+  $("#tourExp").textContent=s.exp;
+  $("#tourTitle").textContent=s.title;
+  $("#tourText").innerHTML=s.text;
+  $("#tourProg").textContent=(i+1)+" / "+TOUR.length;
+  $("#tourBack").style.visibility=i?"visible":"hidden";
+  $("#tourNext").textContent=i===TOUR.length-1?"Finish ✓":"Next →";
+  $("#tourCard").classList.add("open");
+  tourGlow(s.hi);
+  s.do();
+}
+function startTour(){ liftBins.clear(); showTourStep(0); }
+function endTour(){ $("#tourCard").classList.remove("open"); tourGlow(null); tourIdx=-1; }
+$("#tourBtn").addEventListener("click",startTour);
+$("#tourNext").addEventListener("click",()=>{ tourIdx<TOUR.length-1?showTourStep(tourIdx+1):endTour(); });
+$("#tourBack").addEventListener("click",()=>{ if(tourIdx>0) showTourStep(tourIdx-1); });
+$("#tourExit").addEventListener("click",endTour);
+
+/* ---------------- snapshot ---------------- */
+$("#snapBtn").addEventListener("click",()=>{
+  const c=document.createElement("canvas");
+  c.width=view.width; c.height=view.height+46;
+  const x=c.getContext("2d");
+  x.fillStyle="#0a0f15"; x.fillRect(0,0,c.width,c.height);
+  x.drawImage(view,0,0);
+  x.fillStyle="#0d1319"; x.fillRect(0,view.height,c.width,46);
+  x.fillStyle="#8fa3b5"; x.font="13px Consolas,monospace";
+  const info=BODY_INFO[state.body];
+  const label=state.body==="custom"?"NACA "+state.customNaca:info.label;
+  x.fillText(`DIGITAL WIND TUNNEL · ${label} · α=${state.alpha.toFixed(1)}° · V=${state.speed} m/s · Ma=${machNumber().toFixed(2)} · ${state.fluid} · Re=${reynolds()}`,14,view.height+20);
+  x.fillStyle="#5c7186";
+  x.fillText(`C_L=${clS.toFixed(3)} · C_D=${cdS.toFixed(3)} · L/D=${cdS>0.004?(clS/cdS).toFixed(1):"n/a"} · view: ${state.view}`,14,view.height+38);
+  const a=document.createElement("a");
+  a.download="wind-tunnel-"+label.replace(/\s+/g,"-").toLowerCase()+"-a"+state.alpha.toFixed(0)+".png";
+  a.href=c.toDataURL("image/png");
+  a.click();
+  toast("Snapshot saved: check your downloads");
+});
+
+/* ---------------- boot ---------------- */
+function boot(){
+  allocate();
+  buildBarrier();
+  initFlow();
+  sizeCanvases();
+  sizeCharts();
+  setSpeed(30);
+  setView("speed");
+  syncAlphaUI();
+  updateLegend();
+  addEventListener("resize",()=>{ sizeCharts(); drawHistory(); drawLift(); });
+  requestAnimationFrame(tick);
+  // first-visit welcome
+  try{
+    if(!localStorage.getItem("dwt-seen")){
+      localStorage.setItem("dwt-seen","1");
+      openModal("#anatomyModal");
+    }
+  }catch(e){}
+}
+boot();
+})();
+</script>
+</body>
+</html>
